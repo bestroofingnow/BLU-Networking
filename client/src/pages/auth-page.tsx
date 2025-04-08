@@ -1,81 +1,94 @@
-import { useEffect } from "react";
-import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { insertUserSchema } from "@shared/schema";
-import { useAuth } from "@/hooks/use-auth";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Calendar, BookOpen, Users, BarChart3 } from "lucide-react";
-
-const loginSchema = z.object({
-  username: z.string().min(1, "Username is required"),
-  password: z.string().min(1, "Password is required"),
-});
-
-const registerSchema = insertUserSchema
-  .extend({
-    confirmPassword: z.string().min(1, "Please confirm your password"),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ["confirmPassword"],
-  });
-
-type LoginFormValues = z.infer<typeof loginSchema>;
-type RegisterFormValues = z.infer<typeof registerSchema>;
+import { useState } from "react";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function AuthPage() {
-  const [_, navigate] = useLocation();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loginForm, setLoginForm] = useState({
+    username: "",
+    password: "",
+  });
+
+  const [registerForm, setRegisterForm] = useState({
+    username: "",
+    fullName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    company: "BLU",
+    title: "Member",
+  });
   
-  const loginForm = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      username: "",
-      password: "",
-    },
-  });
-
-  const registerForm = useForm<RegisterFormValues>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: {
-      username: "",
-      fullName: "",
-      email: "",
-      password: "",
-      confirmPassword: "",
-      company: "",
-      title: "",
-      bio: "",
-      industry: "",
-      expertise: "",
-      phoneNumber: "",
-    },
-  });
-
-  const onLoginSubmit = (values: LoginFormValues) => {
-    // Temporarily disabled
-    console.log('Login submitted:', values);
-    // Will be enabled once auth is fixed
+  const handleLoginChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setLoginForm({
+      ...loginForm,
+      [e.target.name]: e.target.value,
+    });
   };
 
-  const onRegisterSubmit = (values: RegisterFormValues) => {
-    // Temporarily disabled
-    console.log('Register submitted:', values);
-    // Will be enabled once auth is fixed
+  const handleRegisterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setRegisterForm({
+      ...registerForm,
+      [e.target.name]: e.target.value,
+    });
   };
 
-  // Comment out until auth is working
-  // useEffect(() => {
-  //   if (user) {
-  //     navigate("/");
-  //   }
-  // }, [user, navigate]);
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const response = await apiRequest("POST", "/api/login", loginForm);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to login");
+      }
+      
+      const user = await response.json();
+      console.log("Logged in successfully:", user);
+      window.location.href = "/";
+    } catch (err: any) {
+      setError(err.message || "Login failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    
+    if (registerForm.password !== registerForm.confirmPassword) {
+      setError("Passwords don't match");
+      setIsLoading(false);
+      return;
+    }
+    
+    try {
+      const { confirmPassword, ...userData } = registerForm;
+      const response = await apiRequest("POST", "/api/register", userData);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to register");
+      }
+      
+      const user = await response.json();
+      console.log("Registered successfully:", user);
+      window.location.href = "/";
+    } catch (err: any) {
+      setError(err.message || "Registration failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
@@ -100,157 +113,153 @@ export default function AuthPage() {
               </TabsList>
               
               <TabsContent value="login">
-                <Form {...loginForm}>
-                  <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
-                    <FormField
-                      control={loginForm.control}
+                <form onSubmit={handleLoginSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <label htmlFor="username" className="text-sm font-medium">Username</label>
+                    <Input 
+                      id="username"
                       name="username"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Username</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter your username" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      value={loginForm.username}
+                      onChange={handleLoginChange}
+                      placeholder="Enter your username" 
+                      required
                     />
-                    
-                    <FormField
-                      control={loginForm.control}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label htmlFor="password" className="text-sm font-medium">Password</label>
+                    <Input 
+                      id="password"
                       name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Password</FormLabel>
-                          <FormControl>
-                            <Input type="password" placeholder="Enter your password" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      type="password"
+                      value={loginForm.password}
+                      onChange={handleLoginChange}
+                      placeholder="Enter your password" 
+                      required
                     />
-                    
-                    <Button 
-                      type="submit" 
-                      className="w-full"
-                    >
-                      Login
-                    </Button>
-                  </form>
-                </Form>
+                  </div>
+                  
+                  <Button 
+                    type="submit" 
+                    className="w-full"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? "Logging in..." : "Login"}
+                  </Button>
+                  
+                  {error && (
+                    <div className="text-red-500 text-sm mt-2">
+                      {error}
+                    </div>
+                  )}
+                </form>
               </TabsContent>
               
               <TabsContent value="register">
-                <Form {...registerForm}>
-                  <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
-                    <FormField
-                      control={registerForm.control}
+                <form onSubmit={handleRegisterSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <label htmlFor="reg-username" className="text-sm font-medium">Username</label>
+                    <Input 
+                      id="reg-username"
                       name="username"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Username</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Create a username" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      value={registerForm.username}
+                      onChange={handleRegisterChange}
+                      placeholder="Create a username" 
+                      required
                     />
-                    
-                    <FormField
-                      control={registerForm.control}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label htmlFor="fullName" className="text-sm font-medium">Full Name</label>
+                    <Input 
+                      id="fullName"
                       name="fullName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Full Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter your full name" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      value={registerForm.fullName}
+                      onChange={handleRegisterChange}
+                      placeholder="Enter your full name" 
+                      required
                     />
-                    
-                    <FormField
-                      control={registerForm.control}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label htmlFor="email" className="text-sm font-medium">Email</label>
+                    <Input 
+                      id="email"
                       name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input type="email" placeholder="Enter your email" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      type="email"
+                      value={registerForm.email}
+                      onChange={handleRegisterChange}
+                      placeholder="Enter your email" 
+                      required
                     />
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={registerForm.control}
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label htmlFor="company" className="text-sm font-medium">Company</label>
+                      <Input 
+                        id="company"
                         name="company"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Company</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Your company" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={registerForm.control}
-                        name="title"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Job Title</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Your title" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+                        value={registerForm.company}
+                        onChange={handleRegisterChange}
+                        placeholder="Your company" 
+                        required
                       />
                     </div>
                     
-                    <FormField
-                      control={registerForm.control}
+                    <div className="space-y-2">
+                      <label htmlFor="title" className="text-sm font-medium">Job Title</label>
+                      <Input 
+                        id="title"
+                        name="title"
+                        value={registerForm.title}
+                        onChange={handleRegisterChange}
+                        placeholder="Your title" 
+                        required
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label htmlFor="reg-password" className="text-sm font-medium">Password</label>
+                    <Input 
+                      id="reg-password"
                       name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Password</FormLabel>
-                          <FormControl>
-                            <Input type="password" placeholder="Create a password" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      type="password"
+                      value={registerForm.password}
+                      onChange={handleRegisterChange}
+                      placeholder="Create a password" 
+                      required
                     />
-                    
-                    <FormField
-                      control={registerForm.control}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label htmlFor="confirmPassword" className="text-sm font-medium">Confirm Password</label>
+                    <Input 
+                      id="confirmPassword"
                       name="confirmPassword"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Confirm Password</FormLabel>
-                          <FormControl>
-                            <Input type="password" placeholder="Confirm your password" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      type="password"
+                      value={registerForm.confirmPassword}
+                      onChange={handleRegisterChange}
+                      placeholder="Confirm your password" 
+                      required
                     />
-                    
-                    <Button 
-                      type="submit" 
-                      className="w-full"
-                    >
-                      Create Account
-                    </Button>
-                  </form>
-                </Form>
+                  </div>
+                  
+                  <Button 
+                    type="submit" 
+                    className="w-full"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? "Creating account..." : "Create Account"}
+                  </Button>
+                  
+                  {error && (
+                    <div className="text-red-500 text-sm mt-2">
+                      {error}
+                    </div>
+                  )}
+                </form>
               </TabsContent>
             </Tabs>
           </CardContent>

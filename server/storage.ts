@@ -19,9 +19,10 @@ import {
   type InsertMemberSpotlight
 } from "@shared/schema";
 import session from "express-session";
-import createMemoryStore from "memorystore";
-
-const MemoryStore = createMemoryStore(session);
+import { db } from "./db";
+import { pool } from "./db";
+import connectPg from "connect-pg-simple";
+import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
 
 // Interface for storage operations
 export interface IStorage {
@@ -64,275 +65,296 @@ export interface IStorage {
   createMemberSpotlight(spotlight: InsertMemberSpotlight): Promise<MemberSpotlight>;
   
   // Session store
-  sessionStore: session.SessionStore;
+  sessionStore: session.Store;
 }
 
-export class MemStorage implements IStorage {
-  private usersStore: Map<number, User>;
-  private eventsStore: Map<number, Event>;
-  private eventRegistrationsStore: Map<number, EventRegistration>;
-  private leadsStore: Map<number, Lead>;
-  private userGoalsStore: Map<number, UserGoal>;
-  private memberSpotlightsStore: Map<number, MemberSpotlight>;
-  
-  sessionStore: session.SessionStore;
-  
-  private userIdCounter: number = 1;
-  private eventIdCounter: number = 1;
-  private registrationIdCounter: number = 1;
-  private leadIdCounter: number = 1;
-  private goalIdCounter: number = 1;
-  private spotlightIdCounter: number = 1;
+const PostgresSessionStore = connectPg(session);
 
+export class DatabaseStorage implements IStorage {
+  sessionStore: session.Store;
+  
   constructor() {
-    this.usersStore = new Map();
-    this.eventsStore = new Map();
-    this.eventRegistrationsStore = new Map();
-    this.leadsStore = new Map();
-    this.userGoalsStore = new Map();
-    this.memberSpotlightsStore = new Map();
-    
-    this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000 // 24h
+    this.sessionStore = new PostgresSessionStore({
+      pool,
+      createTableIfMissing: true
     });
     
-    // Create an admin user for testing
-    this.createUser({
-      username: "admin",
-      password: "password123", // In real app, this would be hashed
-      fullName: "Admin User",
-      email: "admin@bloccharlotte.org",
-      company: "BLOC",
-      title: "Administrator",
-      bio: "System administrator for BLOC networking app",
-      industry: "Technology",
-      expertise: "System Administration",
-      profileImage: "",
-      phoneNumber: "704-555-1234",
-      isAdmin: true
-    });
+    // Create an admin user for testing if necessary
+    this.initAdminUser();
+  }
+  
+  private async initAdminUser() {
+    // Check if an admin user exists
+    const adminUser = await db.select().from(users).where(eq(users.isAdmin, true)).limit(1);
+    
+    // If no admin user, create one
+    if (adminUser.length === 0) {
+      await this.createUser({
+        username: "admin",
+        password: "password123", // In real app, this would be hashed
+        fullName: "Admin User",
+        email: "admin@blunetworking.org",
+        company: "BLU",
+        title: "Administrator",
+        bio: "System administrator for BLU networking app",
+        industry: "Technology",
+        expertise: "System Administration",
+        profileImage: "",
+        phoneNumber: "704-555-1234",
+        isAdmin: true
+      });
+    }
   }
 
   // User operations
   async getUser(id: number): Promise<User | undefined> {
-    return this.usersStore.get(id);
+    const result = await db.select().from(users).where(eq(users.id, id));
+    return result[0];
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.usersStore.values()).find(
-      (user) => user.username.toLowerCase() === username.toLowerCase()
-    );
+    const result = await db.select().from(users).where(eq(users.username, username));
+    return result[0];
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.userIdCounter++;
-    const now = new Date();
-    const user: User = { 
-      ...insertUser, 
-      id,
+    const result = await db.insert(users).values({
+      ...insertUser,
       isAdmin: insertUser.isAdmin ?? false,
-      joinedAt: now
-    };
-    this.usersStore.set(id, user);
-    return user;
+      joinedAt: new Date()
+    }).returning();
+    
+    return result[0];
   }
   
   async updateUser(id: number, userData: Partial<User>): Promise<User> {
-    const user = await this.getUser(id);
-    if (!user) {
-      throw new Error(`User with ID ${id} not found`);
-    }
-    
     // Don't allow changing sensitive fields
     const { id: _, password: __, isAdmin: ___, joinedAt: ____, ...safeUserData } = userData;
     
-    const updatedUser = { ...user, ...safeUserData };
-    this.usersStore.set(id, updatedUser);
-    return updatedUser;
+    const result = await db.update(users)
+      .set(safeUserData)
+      .where(eq(users.id, id))
+      .returning();
+    
+    return result[0];
   }
   
   async updateUserPassword(id: number, newPassword: string): Promise<boolean> {
-    const user = await this.getUser(id);
-    if (!user) {
-      return false;
-    }
+    const result = await db.update(users)
+      .set({ password: newPassword })
+      .where(eq(users.id, id))
+      .returning();
     
-    const updatedUser = { ...user, password: newPassword };
-    this.usersStore.set(id, updatedUser);
-    return true;
+    return result.length > 0;
   }
   
   async getAllUsers(): Promise<User[]> {
-    return Array.from(this.usersStore.values());
+    return await db.select().from(users);
   }
   
   async getUserCount(): Promise<number> {
-    return this.usersStore.size;
+    const result = await db.select({ count: sql<number>`count(*)` }).from(users);
+    return result[0].count;
   }
   
   // Event operations
   async getEvent(id: number): Promise<Event | undefined> {
-    return this.eventsStore.get(id);
+    const result = await db.select().from(events).where(eq(events.id, id));
+    return result[0];
   }
   
   async getAllEvents(): Promise<Event[]> {
-    return Array.from(this.eventsStore.values());
+    return await db.select().from(events).orderBy(desc(events.date));
   }
   
   async createEvent(event: InsertEvent): Promise<Event> {
-    const id = this.eventIdCounter++;
-    const now = new Date();
-    const newEvent: Event = { ...event, id, createdAt: now };
-    this.eventsStore.set(id, newEvent);
-    return newEvent;
+    const result = await db.insert(events).values({
+      ...event,
+      createdAt: new Date()
+    }).returning();
+    
+    return result[0];
   }
   
   async getActiveEventCount(): Promise<number> {
     const now = new Date();
-    return Array.from(this.eventsStore.values()).filter(
-      event => new Date(event.date) >= now
-    ).length;
+    const today = now.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+    
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(events)
+      .where(gte(events.date, today));
+    
+    return result[0].count;
   }
   
   // Event registration operations
   async getEventRegistration(eventId: number, userId: number): Promise<EventRegistration | undefined> {
-    return Array.from(this.eventRegistrationsStore.values()).find(
-      reg => reg.eventId === eventId && reg.userId === userId
-    );
+    const result = await db.select()
+      .from(eventRegistrations)
+      .where(and(
+        eq(eventRegistrations.eventId, eventId),
+        eq(eventRegistrations.userId, userId)
+      ));
+    
+    return result[0];
   }
   
   async getEventRegistrationCount(eventId: number): Promise<number> {
-    return Array.from(this.eventRegistrationsStore.values()).filter(
-      reg => reg.eventId === eventId
-    ).length;
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(eventRegistrations)
+      .where(eq(eventRegistrations.eventId, eventId));
+    
+    return result[0].count;
   }
   
   async createEventRegistration(registration: InsertEventRegistration): Promise<EventRegistration> {
-    const id = this.registrationIdCounter++;
-    const now = new Date();
-    const newRegistration: EventRegistration = { 
-      ...registration, 
-      id, 
-      registeredAt: now,
+    const result = await db.insert(eventRegistrations).values({
+      ...registration,
+      registeredAt: new Date(),
       attended: false,
       checkedInAt: null
-    };
-    this.eventRegistrationsStore.set(id, newRegistration);
-    return newRegistration;
+    }).returning();
+    
+    return result[0];
   }
   
   async getEventAttendanceCountByUser(userId: number): Promise<number> {
-    return Array.from(this.eventRegistrationsStore.values()).filter(
-      reg => reg.userId === userId && reg.attended
-    ).length;
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(eventRegistrations)
+      .where(and(
+        eq(eventRegistrations.userId, userId),
+        eq(eventRegistrations.attended, true)
+      ));
+    
+    return result[0].count;
   }
   
   // Lead operations
   async getLeadsByUser(userId: number): Promise<Lead[]> {
-    return Array.from(this.leadsStore.values()).filter(
-      lead => lead.userId === userId
-    );
+    return await db.select()
+      .from(leads)
+      .where(eq(leads.userId, userId))
+      .orderBy(desc(leads.createdAt));
   }
   
   async createLead(lead: InsertLead): Promise<Lead> {
-    const id = this.leadIdCounter++;
-    const now = new Date();
-    const newLead: Lead = { ...lead, id, createdAt: now };
-    this.leadsStore.set(id, newLead);
-    return newLead;
+    const result = await db.insert(leads).values({
+      ...lead,
+      createdAt: new Date()
+    }).returning();
+    
+    return result[0];
   }
   
   async getLeadCountByUser(userId: number): Promise<number> {
-    return Array.from(this.leadsStore.values()).filter(
-      lead => lead.userId === userId
-    ).length;
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(leads)
+      .where(eq(leads.userId, userId));
+    
+    return result[0].count;
   }
   
   async getTotalLeadCount(): Promise<number> {
-    return this.leadsStore.size;
+    const result = await db.select({ count: sql<number>`count(*)` }).from(leads);
+    return result[0].count;
   }
   
   async getTotalLeadValueByUser(userId: number): Promise<number> {
-    return Array.from(this.leadsStore.values())
-      .filter(lead => lead.userId === userId)
-      .reduce((sum, lead) => sum + (lead.value || 0), 0);
+    const result = await db.select({
+      total: sql<number>`sum(value)`
+    })
+    .from(leads)
+    .where(eq(leads.userId, userId));
+    
+    return result[0].total || 0;
   }
   
   async getAverageLeadValue(): Promise<number> {
-    const leads = Array.from(this.leadsStore.values());
-    if (leads.length === 0) return 0;
+    const result = await db.select({
+      average: sql<number>`avg(value)`
+    })
+    .from(leads);
     
-    const total = leads.reduce((sum, lead) => sum + (lead.value || 0), 0);
-    return Math.round(total / leads.length);
+    return result[0].average || 0;
   }
   
   // User goals operations
   async getCurrentUserGoals(userId: number): Promise<UserGoal | undefined> {
     const now = new Date();
+    const today = now.toISOString().split('T')[0]; // Format as YYYY-MM-DD
     
-    return Array.from(this.userGoalsStore.values()).find(
-      goal => goal.userId === userId && 
-             new Date(goal.startDate) <= now && 
-             new Date(goal.endDate) >= now
-    );
+    const result = await db.select()
+      .from(userGoals)
+      .where(and(
+        eq(userGoals.userId, userId),
+        lte(userGoals.startDate, today),
+        gte(userGoals.endDate, today)
+      ));
+    
+    return result[0];
   }
   
   async createUserGoal(goal: InsertUserGoal): Promise<UserGoal> {
-    const id = this.goalIdCounter++;
-    const newGoal: UserGoal = { ...goal, id };
-    this.userGoalsStore.set(id, newGoal);
-    return newGoal;
+    const result = await db.insert(userGoals).values(goal).returning();
+    return result[0];
   }
   
   // Member spotlight operations
   async getActiveMemberSpotlight(): Promise<MemberSpotlight | undefined> {
     const now = new Date();
+    const today = now.toISOString().split('T')[0]; // Format as YYYY-MM-DD
     
-    const spotlight = Array.from(this.memberSpotlightsStore.values()).find(
-      s => s.active && (!s.featuredUntil || new Date(s.featuredUntil) >= now)
-    );
+    const spotlight = await db.select()
+      .from(memberSpotlights)
+      .where(and(
+        eq(memberSpotlights.active, true),
+        sql`(${memberSpotlights.featuredUntil} IS NULL OR ${memberSpotlights.featuredUntil} >= ${today})`
+      ))
+      .limit(1);
     
-    if (!spotlight) return undefined;
+    if (spotlight.length === 0) return undefined;
     
-    // Add user data to spotlight
-    const user = await this.getUser(spotlight.userId);
-    return { 
-      ...spotlight, 
-      user: user! 
-    } as MemberSpotlight & { user: User };
+    // Get the user
+    const user = await this.getUser(spotlight[0].userId);
+    if (!user) return undefined;
+    
+    return {
+      ...spotlight[0],
+      user
+    } as unknown as MemberSpotlight;
   }
   
   async getAllMemberSpotlights(): Promise<MemberSpotlight[]> {
-    const spotlights = Array.from(this.memberSpotlightsStore.values());
+    const spotlights = await db.select().from(memberSpotlights);
+    const result: MemberSpotlight[] = [];
     
-    // Add user data to each spotlight
-    return Promise.all(spotlights.map(async (spotlight) => {
+    for (const spotlight of spotlights) {
       const user = await this.getUser(spotlight.userId);
-      return { 
-        ...spotlight, 
-        user: user! 
-      } as MemberSpotlight & { user: User };
-    }));
+      if (user) {
+        result.push({
+          ...spotlight,
+          user
+        } as unknown as MemberSpotlight);
+      }
+    }
+    
+    return result;
   }
   
   async createMemberSpotlight(spotlight: InsertMemberSpotlight): Promise<MemberSpotlight> {
-    const id = this.spotlightIdCounter++;
-    const now = new Date();
-    const newSpotlight: MemberSpotlight = { 
-      ...spotlight, 
-      id, 
-      active: true, 
-      createdAt: now 
-    };
-    this.memberSpotlightsStore.set(id, newSpotlight);
+    const result = await db.insert(memberSpotlights).values({
+      ...spotlight,
+      active: true,
+      createdAt: new Date()
+    }).returning();
     
-    // Add user data to spotlight
     const user = await this.getUser(spotlight.userId);
-    return { 
-      ...newSpotlight, 
-      user: user! 
-    } as MemberSpotlight & { user: User };
+    
+    return {
+      ...result[0],
+      user: user!
+    } as unknown as MemberSpotlight;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

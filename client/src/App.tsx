@@ -15,8 +15,8 @@ function App() {
   return (
     <>
       <Switch>
-        <Route path="/" component={AuthPage} />
         <Route path="/auth" component={AuthPage} />
+        <Route path="/" component={AuthPage} />
         <Route component={NotFound} />
       </Switch>
       <Toaster />
