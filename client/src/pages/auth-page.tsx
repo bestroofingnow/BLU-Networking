@@ -52,7 +52,7 @@ export default function AuthPage() {
       
       const user = await response.json();
       console.log("Logged in successfully:", user);
-      window.location.href = "/";
+      window.location.href = "/"; // This will force a reload and take us to the dashboard
     } catch (err: any) {
       setError(err.message || "Login failed");
     } finally {

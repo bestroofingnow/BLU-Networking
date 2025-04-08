@@ -16,7 +16,13 @@ function App() {
     <>
       <Switch>
         <Route path="/auth" component={AuthPage} />
-        <Route path="/" component={AuthPage} />
+        <Route path="/" component={DashboardPage} />
+        <Route path="/events" component={EventsPage} />
+        <Route path="/members" component={MembersPage} />
+        <Route path="/leads" component={LeadsPage} />
+        <Route path="/analytics" component={AnalyticsPage} />
+        <Route path="/profile" component={ProfilePage} />
+        <Route path="/admin" component={AdminPage} />
         <Route component={NotFound} />
       </Switch>
       <Toaster />
