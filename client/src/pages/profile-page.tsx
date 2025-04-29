@@ -16,6 +16,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Upload, User, Shield, Bell, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
+import { Switch } from "@/components/ui/switch";
 import type { User as UserType } from "@shared/schema";
 
 const profileSchema = z.object({
@@ -45,27 +46,32 @@ const notificationSchema = z.object({
   membershipNews: z.boolean().default(true),
 });
 
+// TypeScript interfaces for form data
+type ProfileFormData = z.infer<typeof profileSchema>;
+type SecurityFormData = z.infer<typeof securitySchema>;
+type NotificationFormData = z.infer<typeof notificationSchema>;
+
 export default function ProfilePage() {
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
   
   // Fetch user data
-  const { data: user, isLoading } = useQuery({
+  const { data: user, isLoading } = useQuery<UserType>({
     queryKey: ["/api/user"],
   });
   
   // Set up the form with the user data when it loads
-  const profileForm = useForm({
+  const profileForm = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
-    values: {
-      fullName: user?.fullName || "",
-      email: user?.email || "",
-      phoneNumber: user?.phoneNumber || "",
-      company: user?.company || "",
-      title: user?.title || "",
-      bio: user?.bio || "",
-      industry: user?.industry || "",
-      expertise: user?.expertise || "",
+    defaultValues: {
+      fullName: "",
+      email: "",
+      phoneNumber: "",
+      company: "",
+      title: "",
+      bio: "",
+      industry: "",
+      expertise: "",
     },
   });
   
@@ -83,9 +89,9 @@ export default function ProfilePage() {
         expertise: user.expertise || "",
       });
     }
-  }, [user, profileForm.reset]);
+  }, [user, profileForm]);
   
-  const securityForm = useForm({
+  const securityForm = useForm<SecurityFormData>({
     resolver: zodResolver(securitySchema),
     defaultValues: {
       currentPassword: "",
@@ -94,7 +100,7 @@ export default function ProfilePage() {
     },
   });
   
-  const notificationForm = useForm({
+  const notificationForm = useForm<NotificationFormData>({
     resolver: zodResolver(notificationSchema),
     defaultValues: {
       emailNotifications: true,
@@ -105,7 +111,7 @@ export default function ProfilePage() {
   });
   
   const updateProfileMutation = useMutation({
-    mutationFn: async (data) => {
+    mutationFn: async (data: ProfileFormData) => {
       return await apiRequest("PATCH", "/api/profile", data);
     },
     onSuccess: () => {
@@ -115,7 +121,7 @@ export default function ProfilePage() {
         description: "Your profile has been updated successfully.",
       });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Update Failed",
         description: error.message,
@@ -124,9 +130,8 @@ export default function ProfilePage() {
     },
   });
   
-  // This mutation would need a corresponding endpoint added in server/routes.ts
   const updatePasswordMutation = useMutation({
-    mutationFn: async (data) => {
+    mutationFn: async (data: SecurityFormData) => {
       return await apiRequest("POST", "/api/change-password", data);
     },
     onSuccess: () => {
@@ -136,7 +141,7 @@ export default function ProfilePage() {
       });
       securityForm.reset();
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Update Failed",
         description: error.message,
@@ -145,9 +150,8 @@ export default function ProfilePage() {
     },
   });
   
-  // This mutation would need a corresponding endpoint added in server/routes.ts
   const updateNotificationsMutation = useMutation({
-    mutationFn: async (data) => {
+    mutationFn: async (data: NotificationFormData) => {
       return await apiRequest("PATCH", "/api/notifications", data);
     },
     onSuccess: () => {
@@ -156,7 +160,7 @@ export default function ProfilePage() {
         description: "Your notification preferences have been updated.",
       });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast({
         title: "Update Failed",
         description: error.message,
@@ -165,20 +169,20 @@ export default function ProfilePage() {
     },
   });
   
-  const onProfileSubmit = (data) => {
+  const onProfileSubmit = (data: ProfileFormData) => {
     updateProfileMutation.mutate(data);
   };
   
-  const onSecuritySubmit = (data) => {
+  const onSecuritySubmit = (data: SecurityFormData) => {
     updatePasswordMutation.mutate(data);
   };
   
-  const onNotificationsSubmit = (data) => {
+  const onNotificationsSubmit = (data: NotificationFormData) => {
     updateNotificationsMutation.mutate(data);
   };
   
-  const handleProfileImageUpload = async (e) => {
-    const file = e.target.files[0];
+  const handleProfileImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
     
     try {
@@ -208,11 +212,11 @@ export default function ProfilePage() {
     }
   };
   
-  const getInitials = (name) => {
+  const getInitials = (name?: string): string => {
     if (!name) return "";
     return name
       .split(' ')
-      .map(part => part[0])
+      .map((part: string) => part[0])
       .join('')
       .toUpperCase();
   };
@@ -692,21 +696,3 @@ export default function ProfilePage() {
   );
 }
 
-// Missing component definition - needed for notifications tab
-const Switch = ({ checked, onCheckedChange }) => {
-  return (
-    <div className={`w-11 h-6 bg-${checked ? 'primary-500' : 'gray-300'} rounded-full p-1 transition-colors relative`}>
-      <div 
-        className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-          checked ? 'translate-x-5' : ''
-        }`} 
-      />
-      <input 
-        type="checkbox"
-        className="sr-only"
-        checked={checked}
-        onChange={() => onCheckedChange(!checked)}
-      />
-    </div>
-  );
-};
