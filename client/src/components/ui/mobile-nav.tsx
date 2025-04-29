@@ -1,4 +1,4 @@
-import { LayoutDashboard, Calendar, Users, BookOpenText, MoreHorizontal } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, BookOpenText, MoreHorizontal, LightbulbIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "wouter";
 import {
@@ -46,6 +46,14 @@ export function MobileNav() {
         <DropdownMenuContent align="end">
           <DropdownMenuItem asChild>
             <Link href="/analytics">Analytics</Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/networking-tips">
+              <div className="flex items-center">
+                <LightbulbIcon className="h-4 w-4 mr-2" />
+                <span>Networking Tips</span>
+              </div>
+            </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href="/profile">Profile</Link>

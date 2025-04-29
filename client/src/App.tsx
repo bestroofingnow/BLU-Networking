@@ -9,6 +9,7 @@ import AnalyticsPage from "@/pages/analytics-page";
 import ProfilePage from "@/pages/profile-page";
 import AdminPage from "@/pages/admin-page";
 import AuthPage from "@/pages/auth-page";
+import NetworkingTipsPage from "@/pages/networking-tips-page";
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
         <Route path="/members" component={MembersPage} />
         <Route path="/leads" component={LeadsPage} />
         <Route path="/analytics" component={AnalyticsPage} />
+        <Route path="/networking-tips" component={NetworkingTipsPage} />
         <Route path="/profile" component={ProfilePage} />
         <Route path="/admin" component={AdminPage} />
         <Route component={NotFound} />
