@@ -1,7 +1,5 @@
-import { useState } from "react";
-import { DashboardLayout } from "@/layouts/dashboard-layout";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,10 +11,12 @@ import { z } from "zod";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Upload, User, Shield, Bell, Settings } from "lucide-react";
+import { Loader2, Upload, User, Shield, Bell, ArrowLeft } from "lucide-react";
+import { Link } from "wouter";
+import type { User as UserType } from "@shared/schema";
 
 const profileSchema = z.object({
   fullName: z.string().min(2, "Full name must be at least 2 characters"),
@@ -46,13 +46,18 @@ const notificationSchema = z.object({
 });
 
 export default function ProfilePage() {
-  const { user } = useAuth();
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
   
+  // Fetch user data
+  const { data: user, isLoading } = useQuery({
+    queryKey: ["/api/user"],
+  });
+  
+  // Set up the form with the user data when it loads
   const profileForm = useForm({
     resolver: zodResolver(profileSchema),
-    defaultValues: {
+    values: {
       fullName: user?.fullName || "",
       email: user?.email || "",
       phoneNumber: user?.phoneNumber || "",
@@ -63,6 +68,22 @@ export default function ProfilePage() {
       expertise: user?.expertise || "",
     },
   });
+  
+  // Reset the form when user data changes
+  useEffect(() => {
+    if (user) {
+      profileForm.reset({
+        fullName: user.fullName || "",
+        email: user.email || "",
+        phoneNumber: user.phoneNumber || "",
+        company: user.company || "",
+        title: user.title || "",
+        bio: user.bio || "",
+        industry: user.industry || "",
+        expertise: user.expertise || "",
+      });
+    }
+  }, [user, profileForm.reset]);
   
   const securityForm = useForm({
     resolver: zodResolver(securitySchema),
@@ -103,6 +124,7 @@ export default function ProfilePage() {
     },
   });
   
+  // This mutation would need a corresponding endpoint added in server/routes.ts
   const updatePasswordMutation = useMutation({
     mutationFn: async (data) => {
       return await apiRequest("POST", "/api/change-password", data);
@@ -123,6 +145,7 @@ export default function ProfilePage() {
     },
   });
   
+  // This mutation would need a corresponding endpoint added in server/routes.ts
   const updateNotificationsMutation = useMutation({
     mutationFn: async (data) => {
       return await apiRequest("PATCH", "/api/notifications", data);
@@ -210,8 +233,26 @@ export default function ProfilePage() {
     "Other"
   ];
   
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
   return (
-    <DashboardLayout title="Profile">
+    <div className="container mx-auto p-6">
+      <div className="flex items-center mb-8">
+        <Link href="/">
+          <Button variant="outline" className="mr-4" size="sm">
+            <ArrowLeft className="mr-2 h-4 w-4" /> 
+            Back to Dashboard
+          </Button>
+        </Link>
+        <h1 className="text-3xl font-bold">My Profile</h1>
+      </div>
+      
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         {/* Profile Sidebar */}
         <Card className="lg:row-span-2">
@@ -386,7 +427,7 @@ export default function ProfilePage() {
                               <FormLabel>Industry</FormLabel>
                               <Select
                                 onValueChange={field.onChange}
-                                defaultValue={field.value}
+                                value={field.value}
                               >
                                 <FormControl>
                                   <SelectTrigger>
@@ -421,20 +462,17 @@ export default function ProfilePage() {
                             </FormItem>
                           )}
                         />
-                      </div>
-                      
-                      <div className="grid grid-cols-1 gap-4">
+                        
                         <FormField
                           control={profileForm.control}
                           name="bio"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Bio</FormLabel>
+                              <FormLabel>Professional Bio</FormLabel>
                               <FormControl>
                                 <Textarea 
-                                  placeholder="Tell other members about yourself and your business" 
-                                  className="resize-none" 
-                                  rows={5}
+                                  placeholder="A brief description of your professional background and interests"
+                                  className="min-h-[120px]"
                                   {...field} 
                                 />
                               </FormControl>
@@ -444,12 +482,17 @@ export default function ProfilePage() {
                         />
                       </div>
                       
-                      <Button 
-                        type="submit" 
-                        disabled={updateProfileMutation.isPending}
-                      >
-                        {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
-                      </Button>
+                      <div className="flex justify-end">
+                        <Button 
+                          type="submit" 
+                          disabled={updateProfileMutation.isPending}
+                        >
+                          {updateProfileMutation.isPending && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          )}
+                          Save Changes
+                        </Button>
+                      </div>
                     </form>
                   </Form>
                 </CardContent>
@@ -459,7 +502,7 @@ export default function ProfilePage() {
             <TabsContent value="security">
               <Card>
                 <CardHeader>
-                  <CardTitle>Password & Security</CardTitle>
+                  <CardTitle>Security Settings</CardTitle>
                   <CardDescription>
                     Update your password and security preferences
                   </CardDescription>
@@ -474,11 +517,7 @@ export default function ProfilePage() {
                           <FormItem>
                             <FormLabel>Current Password</FormLabel>
                             <FormControl>
-                              <Input 
-                                type="password" 
-                                placeholder="Enter your current password" 
-                                {...field} 
-                              />
+                              <Input type="password" placeholder="Enter your current password" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -493,14 +532,10 @@ export default function ProfilePage() {
                             <FormItem>
                               <FormLabel>New Password</FormLabel>
                               <FormControl>
-                                <Input 
-                                  type="password" 
-                                  placeholder="Enter new password" 
-                                  {...field} 
-                                />
+                                <Input type="password" placeholder="Enter new password" {...field} />
                               </FormControl>
                               <FormDescription>
-                                Minimum 8 characters
+                                At least 8 characters
                               </FormDescription>
                               <FormMessage />
                             </FormItem>
@@ -514,11 +549,7 @@ export default function ProfilePage() {
                             <FormItem>
                               <FormLabel>Confirm New Password</FormLabel>
                               <FormControl>
-                                <Input 
-                                  type="password" 
-                                  placeholder="Confirm new password" 
-                                  {...field} 
-                                />
+                                <Input type="password" placeholder="Confirm new password" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -526,12 +557,17 @@ export default function ProfilePage() {
                         />
                       </div>
                       
-                      <Button 
-                        type="submit" 
-                        disabled={updatePasswordMutation.isPending}
-                      >
-                        {updatePasswordMutation.isPending ? "Updating..." : "Update Password"}
-                      </Button>
+                      <div className="flex justify-end">
+                        <Button 
+                          type="submit" 
+                          disabled={updatePasswordMutation.isPending}
+                        >
+                          {updatePasswordMutation.isPending && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          )}
+                          Update Password
+                        </Button>
+                      </div>
                     </form>
                   </Form>
                 </CardContent>
@@ -543,112 +579,107 @@ export default function ProfilePage() {
                 <CardHeader>
                   <CardTitle>Notification Preferences</CardTitle>
                   <CardDescription>
-                    Manage your communication preferences
+                    Choose what types of notifications you'd like to receive
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <Form {...notificationForm}>
                     <form onSubmit={notificationForm.handleSubmit(onNotificationsSubmit)} className="space-y-6">
-                      <div className="space-y-4">
-                        <div className="border rounded-md p-4">
-                          <FormField
-                            control={notificationForm.control}
-                            name="emailNotifications"
-                            render={({ field }) => (
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <FormLabel className="text-base">Email Notifications</FormLabel>
-                                  <FormDescription>
-                                    Receive email notifications about your account activity
-                                  </FormDescription>
-                                </div>
-                                <FormControl>
-                                  <Switch
-                                    checked={field.value}
-                                    onCheckedChange={field.onChange}
-                                  />
-                                </FormControl>
-                              </div>
-                            )}
-                          />
-                        </div>
-                        
-                        <div className="border rounded-md p-4">
-                          <FormField
-                            control={notificationForm.control}
-                            name="eventReminders"
-                            render={({ field }) => (
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <FormLabel className="text-base">Event Reminders</FormLabel>
-                                  <FormDescription>
-                                    Get reminders about upcoming BLOC events
-                                  </FormDescription>
-                                </div>
-                                <FormControl>
-                                  <Switch
-                                    checked={field.value}
-                                    onCheckedChange={field.onChange}
-                                  />
-                                </FormControl>
-                              </div>
-                            )}
-                          />
-                        </div>
-                        
-                        <div className="border rounded-md p-4">
-                          <FormField
-                            control={notificationForm.control}
-                            name="leadUpdates"
-                            render={({ field }) => (
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <FormLabel className="text-base">Lead Updates</FormLabel>
-                                  <FormDescription>
-                                    Receive updates about your lead activity and follow-ups
-                                  </FormDescription>
-                                </div>
-                                <FormControl>
-                                  <Switch
-                                    checked={field.value}
-                                    onCheckedChange={field.onChange}
-                                  />
-                                </FormControl>
-                              </div>
-                            )}
-                          />
-                        </div>
-                        
-                        <div className="border rounded-md p-4">
-                          <FormField
-                            control={notificationForm.control}
-                            name="membershipNews"
-                            render={({ field }) => (
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <FormLabel className="text-base">Membership News</FormLabel>
-                                  <FormDescription>
-                                    Receive updates about BLOC membership and organization news
-                                  </FormDescription>
-                                </div>
-                                <FormControl>
-                                  <Switch
-                                    checked={field.value}
-                                    onCheckedChange={field.onChange}
-                                  />
-                                </FormControl>
-                              </div>
-                            )}
-                          />
-                        </div>
-                      </div>
+                      <FormField
+                        control={notificationForm.control}
+                        name="emailNotifications"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">Email Notifications</FormLabel>
+                              <FormDescription>
+                                Receive email notifications about account activity
+                              </FormDescription>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
                       
-                      <Button 
-                        type="submit" 
-                        disabled={updateNotificationsMutation.isPending}
-                      >
-                        {updateNotificationsMutation.isPending ? "Saving..." : "Save Preferences"}
-                      </Button>
+                      <FormField
+                        control={notificationForm.control}
+                        name="eventReminders"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">Event Reminders</FormLabel>
+                              <FormDescription>
+                                Receive reminders about upcoming events you've registered for
+                              </FormDescription>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={notificationForm.control}
+                        name="leadUpdates"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">Lead Updates</FormLabel>
+                              <FormDescription>
+                                Get notified about activity related to your leads
+                              </FormDescription>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={notificationForm.control}
+                        name="membershipNews"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                              <FormLabel className="text-base">Membership News</FormLabel>
+                              <FormDescription>
+                                Receive updates about BLU membership benefits and opportunities
+                              </FormDescription>
+                            </div>
+                            <FormControl>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <div className="flex justify-end">
+                        <Button 
+                          type="submit" 
+                          disabled={updateNotificationsMutation.isPending}
+                        >
+                          {updateNotificationsMutation.isPending && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          )}
+                          Save Preferences
+                        </Button>
+                      </div>
                     </form>
                   </Form>
                 </CardContent>
@@ -657,20 +688,25 @@ export default function ProfilePage() {
           </Tabs>
         </div>
       </div>
-    </DashboardLayout>
-  );
-}
-
-// Simple Switch component for notification toggles
-function Switch({ checked, onCheckedChange }) {
-  return (
-    <div 
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${checked ? 'bg-primary-500' : 'bg-neutral-200'}`}
-      onClick={() => onCheckedChange(!checked)}
-    >
-      <span 
-        className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${checked ? 'translate-x-6' : 'translate-x-1'}`} 
-      />
     </div>
   );
 }
+
+// Missing component definition - needed for notifications tab
+const Switch = ({ checked, onCheckedChange }) => {
+  return (
+    <div className={`w-11 h-6 bg-${checked ? 'primary-500' : 'gray-300'} rounded-full p-1 transition-colors relative`}>
+      <div 
+        className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
+          checked ? 'translate-x-5' : ''
+        }`} 
+      />
+      <input 
+        type="checkbox"
+        className="sr-only"
+        checked={checked}
+        onChange={() => onCheckedChange(!checked)}
+      />
+    </div>
+  );
+};
