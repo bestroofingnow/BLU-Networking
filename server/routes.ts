@@ -1,16 +1,17 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { insertEventSchema, insertEventRegistrationSchema, insertLeadSchema, insertMemberSpotlightSchema } from "@shared/schema";
 import { z } from "zod";
+import { generateNetworkingTips, NetworkingTipsRequest } from "./openai";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication routes
   setupAuth(app);
 
   // Ensure user is authenticated
-  const ensureAuthenticated = (req: Express.Request, res: Express.Response, next: Function) => {
+  const ensureAuthenticated = (req: Request, res: Response, next: Function) => {
     if (req.isAuthenticated()) {
       return next();
     }
@@ -18,7 +19,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
   
   // Ensure user is admin
-  const ensureAdmin = (req: Express.Request, res: Express.Response, next: Function) => {
+  const ensureAdmin = (req: Request, res: Response, next: Function) => {
     if (req.isAuthenticated() && req.user?.isAdmin) {
       return next();
     }
@@ -438,6 +439,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Notification preferences updated" });
     } catch (error) {
       res.status(500).json({ message: "Failed to update notification preferences" });
+    }
+  });
+
+  // Networking tips
+  app.post("/api/networking-tips", ensureAuthenticated, async (req, res) => {
+    try {
+      // Get the user's profile data to enhance the networking request
+      const user = await storage.getUser(req.user!.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Combine user profile with the request data
+      const tipRequest: NetworkingTipsRequest = {
+        ...req.body,
+        fullName: user.fullName || user.username,
+        industry: user.industry || req.body.industry,
+        expertise: user.expertise || req.body.expertise,
+        company: user.company || req.body.company,
+        title: user.title || req.body.title
+      };
+
+      // Generate personalized networking tips using OpenAI
+      const tips = await generateNetworkingTips(tipRequest);
+      
+      res.json(tips);
+    } catch (error) {
+      console.error("Error generating networking tips:", error);
+      res.status(500).json({ 
+        message: "Failed to generate networking tips",
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
     }
   });
 
