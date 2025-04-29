@@ -408,6 +408,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to change password" });
     }
   });
+  
+  // Profile image upload
+  app.post("/api/profile/image", ensureAuthenticated, async (req, res) => {
+    try {
+      // In a real application, you would:
+      // 1. Use multipart form-data handling middleware (e.g., multer)
+      // 2. Process the uploaded image (e.g., resize, optimize)
+      // 3. Store it in a cloud storage service or server filesystem
+      // 4. Save the image URL/path to the user's profile in the database
+      
+      // For demo purposes, we'll just update the user with a placeholder image URL
+      const demoImageUrl = "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y";
+      
+      const updatedUser = await storage.updateUser(req.user!.id, { 
+        profileImage: demoImageUrl 
+      });
+      
+      res.json(updatedUser);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to upload profile image" });
+    }
+  });
 
   // Notification settings
   app.patch("/api/notifications", ensureAuthenticated, async (req, res) => {

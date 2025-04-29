@@ -188,13 +188,13 @@ export default function ProfilePage() {
     try {
       setIsUploading(true);
       
-      // For a real implementation, you would use FormData and send to your server
+      // In a real implementation with file upload handling on the server:
       // const formData = new FormData();
       // formData.append('profileImage', file);
       // await apiRequest("POST", "/api/profile/image", formData);
       
-      // Mock successful upload
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // For this simplified version, we just call the endpoint
+      await apiRequest("POST", "/api/profile/image", {});
       
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       toast({
@@ -264,7 +264,7 @@ export default function ProfilePage() {
             <div className="flex flex-col items-center space-y-4">
               <div className="relative">
                 <Avatar className="h-24 w-24">
-                  <AvatarImage src={user?.profileImage} alt={user?.fullName} />
+                  <AvatarImage src={user?.profileImage || undefined} alt={user?.fullName || ""} />
                   <AvatarFallback>{getInitials(user?.fullName)}</AvatarFallback>
                 </Avatar>
                 
