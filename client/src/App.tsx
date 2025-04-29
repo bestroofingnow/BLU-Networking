@@ -10,20 +10,23 @@ import ProfilePage from "@/pages/profile-page";
 import AdminPage from "@/pages/admin-page";
 import AuthPage from "@/pages/auth-page";
 import NetworkingTipsPage from "@/pages/networking-tips-page";
+import LandingPage from "@/pages/landing-page";
+import { ProtectedRoute } from "./lib/protected-route";
 
 function App() {
   return (
     <>
       <Switch>
+        <Route path="/" component={LandingPage} />
         <Route path="/auth" component={AuthPage} />
-        <Route path="/" component={DashboardPage} />
-        <Route path="/events" component={EventsPage} />
-        <Route path="/members" component={MembersPage} />
-        <Route path="/leads" component={LeadsPage} />
-        <Route path="/analytics" component={AnalyticsPage} />
-        <Route path="/networking-tips" component={NetworkingTipsPage} />
-        <Route path="/profile" component={ProfilePage} />
-        <Route path="/admin" component={AdminPage} />
+        <ProtectedRoute path="/dashboard" component={DashboardPage} />
+        <ProtectedRoute path="/events" component={EventsPage} />
+        <ProtectedRoute path="/members" component={MembersPage} />
+        <ProtectedRoute path="/leads" component={LeadsPage} />
+        <ProtectedRoute path="/analytics" component={AnalyticsPage} />
+        <ProtectedRoute path="/networking-tips" component={NetworkingTipsPage} />
+        <ProtectedRoute path="/profile" component={ProfilePage} />
+        <ProtectedRoute path="/admin" component={AdminPage} />
         <Route component={NotFound} />
       </Switch>
       <Toaster />
