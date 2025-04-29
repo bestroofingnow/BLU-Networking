@@ -9,7 +9,6 @@ import AnalyticsPage from "@/pages/analytics-page";
 import ProfilePage from "@/pages/profile-page";
 import AdminPage from "@/pages/admin-page";
 import AuthPage from "@/pages/auth-page";
-import { ProtectedRoute } from "./lib/protected-route";
 
 function App() {
   return (

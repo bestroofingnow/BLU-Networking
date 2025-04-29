@@ -2,12 +2,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, BookOpen, Users, BarChart3 } from "lucide-react";
-import { useState } from "react";
-import { apiRequest } from "@/lib/queryClient";
+import { Calendar, BookOpen, Users, BarChart3, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useLocation } from "wouter";
 
 export default function AuthPage() {
-  const [isLoading, setIsLoading] = useState(false);
+  const [location, setLocation] = useLocation();
+  const [isFormLoading, setIsFormLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loginForm, setLoginForm] = useState({
     username: "",
@@ -40,7 +42,7 @@ export default function AuthPage() {
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    setIsFormLoading(true);
     setError(null);
     
     try {
@@ -52,22 +54,27 @@ export default function AuthPage() {
       
       const user = await response.json();
       console.log("Logged in successfully:", user);
-      window.location.href = "/"; // This will force a reload and take us to the dashboard
+      
+      // Update the query cache with the user data
+      queryClient.setQueryData(["/api/user"], user);
+      
+      // Redirect to dashboard
+      window.location.href = "/";
     } catch (err: any) {
       setError(err.message || "Login failed");
     } finally {
-      setIsLoading(false);
+      setIsFormLoading(false);
     }
   };
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    setIsFormLoading(true);
     setError(null);
     
     if (registerForm.password !== registerForm.confirmPassword) {
       setError("Passwords don't match");
-      setIsLoading(false);
+      setIsFormLoading(false);
       return;
     }
     
@@ -86,7 +93,7 @@ export default function AuthPage() {
     } catch (err: any) {
       setError(err.message || "Registration failed");
     } finally {
-      setIsLoading(false);
+      setIsFormLoading(false);
     }
   };
   
@@ -142,9 +149,9 @@ export default function AuthPage() {
                   <Button 
                     type="submit" 
                     className="w-full"
-                    disabled={isLoading}
+                    disabled={isFormLoading}
                   >
-                    {isLoading ? "Logging in..." : "Login"}
+                    {isFormLoading ? "Logging in..." : "Login"}
                   </Button>
                   
                   {error && (
@@ -249,9 +256,9 @@ export default function AuthPage() {
                   <Button 
                     type="submit" 
                     className="w-full"
-                    disabled={isLoading}
+                    disabled={isFormLoading}
                   >
-                    {isLoading ? "Creating account..." : "Create Account"}
+                    {isFormLoading ? "Creating account..." : "Create Account"}
                   </Button>
                   
                   {error && (
