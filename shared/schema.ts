@@ -156,6 +156,27 @@ export const insertMemberMessageSchema = createInsertSchema(memberMessages).omit
   sentAt: true,
 });
 
+// Board meeting minutes schema
+export const boardMeetingMinutes = pgTable("board_meeting_minutes", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  meetingDate: date("meeting_date").notNull(),
+  attendees: text("attendees").array().notNull(),
+  agenda: text("agenda"),
+  minutes: text("minutes").notNull(),
+  actionItems: text("action_items").array(),
+  nextMeetingDate: date("next_meeting_date"),
+  isPublished: boolean("is_published").default(false),
+  createdById: integer("created_by_id").references(() => users.id).notNull(),
+  chapterId: integer("chapter_id").references(() => chapters.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertBoardMeetingMinutesSchema = createInsertSchema(boardMeetingMinutes).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Relations
 import { relations } from "drizzle-orm";
 
@@ -235,6 +256,17 @@ export const memberMessagesRelations = relations(memberMessages, ({ one }) => ({
   }),
 }));
 
+export const boardMeetingMinutesRelations = relations(boardMeetingMinutes, ({ one }) => ({
+  createdBy: one(users, {
+    fields: [boardMeetingMinutes.createdById],
+    references: [users.id],
+  }),
+  chapter: one(chapters, {
+    fields: [boardMeetingMinutes.chapterId],
+    references: [chapters.id],
+  }),
+}));
+
 // Type definitions
 export type InsertChapter = z.infer<typeof insertChapterSchema>;
 export type Chapter = typeof chapters.$inferSelect;
@@ -259,6 +291,9 @@ export type MemberSpotlight = typeof memberSpotlights.$inferSelect;
 
 export type InsertMemberMessage = z.infer<typeof insertMemberMessageSchema>;
 export type MemberMessage = typeof memberMessages.$inferSelect;
+
+export type InsertBoardMeetingMinutes = z.infer<typeof insertBoardMeetingMinutesSchema>;
+export type BoardMeetingMinutes = typeof boardMeetingMinutes.$inferSelect;
 
 // User level permissions
 export const USER_LEVELS = {

@@ -10,6 +10,7 @@ import ProfilePage from "@/pages/profile-page";
 import AdminPage from "@/pages/admin-page";
 import AuthPage from "@/pages/auth-page";
 import NetworkingTipsPage from "@/pages/networking-tips-page";
+import BoardMinutesPage from "@/pages/board-minutes-page";
 import LandingPage from "@/pages/landing-page";
 import { ProtectedRoute } from "./lib/protected-route";
 
@@ -25,6 +26,7 @@ function App() {
         <ProtectedRoute path="/leads" component={LeadsPage} />
         <ProtectedRoute path="/analytics" component={AnalyticsPage} />
         <ProtectedRoute path="/networking-tips" component={NetworkingTipsPage} />
+        <ProtectedRoute path="/board-minutes" component={BoardMinutesPage} />
         <ProtectedRoute path="/profile" component={ProfilePage} />
         <ProtectedRoute path="/admin" component={AdminPage} />
         <Route component={NotFound} />

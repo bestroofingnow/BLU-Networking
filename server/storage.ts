@@ -7,6 +7,7 @@ import {
   userGoals, 
   memberSpotlights,
   memberMessages,
+  boardMeetingMinutes,
   type User, 
   type InsertUser,
   type Chapter,
@@ -23,6 +24,8 @@ import {
   type InsertMemberSpotlight,
   type MemberMessage,
   type InsertMemberMessage,
+  type BoardMeetingMinutes,
+  type InsertBoardMeetingMinutes,
   type UserLevel,
   USER_LEVELS
 } from "@shared/schema";
@@ -86,6 +89,13 @@ export interface IStorage {
   createMemberMessage(message: InsertMemberMessage): Promise<MemberMessage>;
   markMessageAsRead(messageId: number): Promise<boolean>;
   
+  // Board meeting minutes operations
+  getBoardMeetingMinutes(chapterId?: number): Promise<BoardMeetingMinutes[]>;
+  getBoardMeetingMinute(id: number): Promise<BoardMeetingMinutes | undefined>;
+  createBoardMeetingMinutes(minutes: InsertBoardMeetingMinutes): Promise<BoardMeetingMinutes>;
+  updateBoardMeetingMinutes(id: number, minutes: Partial<BoardMeetingMinutes>): Promise<BoardMeetingMinutes>;
+  deleteBoardMeetingMinutes(id: number): Promise<boolean>;
+  
   // Session store
   sessionStore: session.Store;
 }
@@ -106,11 +116,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   private async initAdminUser() {
-    // Check if an admin user exists
-    const adminUser = await db.select().from(users).where(eq(users.userLevel, USER_LEVELS.EXECUTIVE_BOARD)).limit(1);
-    
-    // If no admin user, create one
-    if (adminUser.length === 0) {
+    try {
       // First ensure we have a default chapter
       let defaultChapter = await db.select().from(chapters).limit(1);
       if (defaultChapter.length === 0) {
@@ -121,26 +127,42 @@ export class DatabaseStorage implements IStorage {
         }).returning();
       }
 
-      await this.createUser({
-        username: "admin",
-        password: "password123", // In real app, this would be hashed
-        fullName: "Admin User",
-        email: "admin@blunetworking.org",
-        company: "BLU",
-        title: "Administrator",
-        bio: "System administrator for BLU networking app",
-        industry: "Technology",
-        expertise: "System Administration",
-        profileImage: "",
-        phoneNumber: "704-555-1234",
-        chapterId: defaultChapter[0].id
-      });
+      // Check if admin user already exists
+      const existingAdmin = await this.getUserByUsername("admin");
+      
+      if (!existingAdmin) {
+        // Create admin user
+        await this.createUser({
+          username: "admin",
+          password: "password123", // In real app, this would be hashed
+          fullName: "Admin User",
+          email: "admin@blunetworking.org",
+          company: "BLU",
+          title: "Administrator",
+          bio: "System administrator for BLU networking app",
+          industry: "Technology",
+          expertise: "System Administration",
+          profileImage: "",
+          phoneNumber: "704-555-1234",
+          chapterId: defaultChapter[0].id
+        });
 
-      // Update the created user to executive board level
-      const createdAdmin = await this.getUserByUsername("admin");
-      if (createdAdmin) {
-        await this.updateUserLevel(createdAdmin.id, USER_LEVELS.EXECUTIVE_BOARD);
+        // Update the created user to executive board level
+        const createdAdmin = await this.getUserByUsername("admin");
+        if (createdAdmin) {
+          await this.updateUserLevel(createdAdmin.id, USER_LEVELS.EXECUTIVE_BOARD);
+        }
+      } else {
+        // Ensure existing admin has correct chapter and level
+        if (!existingAdmin.chapterId) {
+          await this.updateUser(existingAdmin.id, { chapterId: defaultChapter[0].id });
+        }
+        if (existingAdmin.userLevel !== USER_LEVELS.EXECUTIVE_BOARD) {
+          await this.updateUserLevel(existingAdmin.id, USER_LEVELS.EXECUTIVE_BOARD);
+        }
       }
+    } catch (error) {
+      console.error("Error initializing admin user:", error);
     }
   }
 
@@ -465,6 +487,53 @@ export class DatabaseStorage implements IStorage {
       return true;
     } catch (error) {
       console.error("Error marking message as read:", error);
+      return false;
+    }
+  }
+
+  // Board meeting minutes operations
+  async getBoardMeetingMinutes(chapterId?: number): Promise<BoardMeetingMinutes[]> {
+    const query = db.select().from(boardMeetingMinutes);
+    
+    if (chapterId) {
+      return await query.where(eq(boardMeetingMinutes.chapterId, chapterId))
+        .orderBy(desc(boardMeetingMinutes.meetingDate));
+    }
+    
+    return await query.orderBy(desc(boardMeetingMinutes.meetingDate));
+  }
+
+  async getBoardMeetingMinute(id: number): Promise<BoardMeetingMinutes | undefined> {
+    const result = await db.select().from(boardMeetingMinutes)
+      .where(eq(boardMeetingMinutes.id, id));
+    return result[0];
+  }
+
+  async createBoardMeetingMinutes(minutes: InsertBoardMeetingMinutes): Promise<BoardMeetingMinutes> {
+    const result = await db.insert(boardMeetingMinutes).values({
+      ...minutes,
+      createdAt: new Date()
+    }).returning();
+    return result[0];
+  }
+
+  async updateBoardMeetingMinutes(id: number, minutesData: Partial<BoardMeetingMinutes>): Promise<BoardMeetingMinutes> {
+    const { id: _, createdAt: __, ...safeData } = minutesData;
+    
+    const result = await db.update(boardMeetingMinutes)
+      .set(safeData)
+      .where(eq(boardMeetingMinutes.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteBoardMeetingMinutes(id: number): Promise<boolean> {
+    try {
+      await db.delete(boardMeetingMinutes)
+        .where(eq(boardMeetingMinutes.id, id));
+      return true;
+    } catch (error) {
+      console.error("Error deleting board meeting minutes:", error);
       return false;
     }
   }

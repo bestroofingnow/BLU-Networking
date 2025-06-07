@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { insertEventSchema, insertEventRegistrationSchema, insertLeadSchema, insertMemberSpotlightSchema } from "@shared/schema";
+import { insertEventSchema, insertEventRegistrationSchema, insertLeadSchema, insertMemberSpotlightSchema, insertBoardMeetingMinutesSchema } from "@shared/schema";
 import { z } from "zod";
 import { generateNetworkingTips, NetworkingTipsRequest } from "./openai";
 
@@ -600,6 +600,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedUser);
     } catch (error) {
       res.status(500).json({ message: "Failed to update user level" });
+    }
+  });
+
+  // Board Meeting Minutes routes (board members and executive board only)
+  app.get("/api/board-minutes", ensureBoardMember, async (req, res) => {
+    try {
+      const user = req.user!;
+      let chapterId = undefined;
+      
+      // Regular board members can only see their chapter's minutes
+      if (user.userLevel === "board_member") {
+        chapterId = user.chapterId || undefined;
+      }
+      
+      const minutes = await storage.getBoardMeetingMinutes(chapterId);
+      res.json(minutes);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch board meeting minutes" });
+    }
+  });
+
+  app.get("/api/board-minutes/:id", ensureBoardMember, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const minute = await storage.getBoardMeetingMinute(id);
+      
+      if (!minute) {
+        return res.status(404).json({ message: "Meeting minutes not found" });
+      }
+      
+      const user = req.user!;
+      
+      // Check if user has access to this chapter's minutes
+      if (user.userLevel === "board_member" && user.chapterId !== minute.chapterId) {
+        return res.status(403).json({ message: "Access denied to this chapter's minutes" });
+      }
+      
+      res.json(minute);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch meeting minutes" });
+    }
+  });
+
+  app.post("/api/board-minutes", ensureBoardMember, async (req, res) => {
+    try {
+      const user = req.user!;
+      
+      if (!user.chapterId) {
+        return res.status(400).json({ message: "User must belong to a chapter to create meeting minutes" });
+      }
+      
+      const validatedData = insertBoardMeetingMinutesSchema.parse({
+        ...req.body,
+        createdById: user.id,
+        chapterId: user.chapterId
+      });
+      
+      const minutes = await storage.createBoardMeetingMinutes(validatedData);
+      res.status(201).json(minutes);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create meeting minutes" });
+    }
+  });
+
+  app.patch("/api/board-minutes/:id", ensureBoardMember, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const user = req.user!;
+      
+      // Get existing minutes to check permissions
+      const existingMinutes = await storage.getBoardMeetingMinute(id);
+      if (!existingMinutes) {
+        return res.status(404).json({ message: "Meeting minutes not found" });
+      }
+      
+      // Check if user has permission to edit
+      if (user.userLevel === "board_member" && 
+          (user.chapterId !== existingMinutes.chapterId || user.id !== existingMinutes.createdById)) {
+        return res.status(403).json({ message: "Permission denied" });
+      }
+      
+      const updatedMinutes = await storage.updateBoardMeetingMinutes(id, req.body);
+      res.json(updatedMinutes);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update meeting minutes" });
+    }
+  });
+
+  app.delete("/api/board-minutes/:id", ensureBoardMember, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const user = req.user!;
+      
+      // Get existing minutes to check permissions
+      const existingMinutes = await storage.getBoardMeetingMinute(id);
+      if (!existingMinutes) {
+        return res.status(404).json({ message: "Meeting minutes not found" });
+      }
+      
+      // Only executive board or creator can delete
+      if (user.userLevel !== "executive_board" && user.id !== existingMinutes.createdById) {
+        return res.status(403).json({ message: "Permission denied" });
+      }
+      
+      const success = await storage.deleteBoardMeetingMinutes(id);
+      if (success) {
+        res.json({ message: "Meeting minutes deleted successfully" });
+      } else {
+        res.status(500).json({ message: "Failed to delete meeting minutes" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete meeting minutes" });
     }
   });
 
