@@ -18,21 +18,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(401).json({ message: "Unauthorized" });
   };
   
-  // Ensure user is admin
-  const ensureAdmin = (req: Request, res: Response, next: Function) => {
-    if (req.isAuthenticated() && req.user?.isAdmin) {
-      return next();
+  // Ensure user has board member access or higher
+  const ensureBoardMember = (req: Request, res: Response, next: Function) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
     }
-    res.status(403).json({ message: "Forbidden" });
+    const userLevel = req.user?.userLevel;
+    if (userLevel !== "board_member" && userLevel !== "executive_board") {
+      return res.status(403).json({ message: "Board member access required" });
+    }
+    next();
+  };
+
+  // Ensure user has executive board access
+  const ensureExecutiveBoard = (req: Request, res: Response, next: Function) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    if (req.user?.userLevel !== "executive_board") {
+      return res.status(403).json({ message: "Executive board access required" });
+    }
+    next();
   };
 
   // User routes
   app.get("/api/members", ensureAuthenticated, async (req, res) => {
     try {
-      const members = await storage.getAllUsers();
+      const user = req.user!;
+      let members;
+      
+      // Regular members can only see members from their chapter
+      if (user.userLevel === "member" && user.chapterId) {
+        members = await storage.getUsersByChapter(user.chapterId);
+      } else {
+        // Board members and executive board can see all members
+        members = await storage.getAllUsers();
+      }
+      
       res.json(members);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch members" });
+    }
+  });
+
+  // Chapter routes
+  app.get("/api/chapters", ensureAuthenticated, async (req, res) => {
+    try {
+      const chapters = await storage.getAllChapters();
+      res.json(chapters);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch chapters" });
+    }
+  });
+
+  app.post("/api/chapters", ensureExecutiveBoard, async (req, res) => {
+    try {
+      const chapter = await storage.createChapter(req.body);
+      res.status(201).json(chapter);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create chapter" });
     }
   });
   
@@ -68,7 +112,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/events", ensureAdmin, async (req, res) => {
+  app.post("/api/events", ensureBoardMember, async (req, res) => {
     try {
       const validatedData = insertEventSchema.parse({
         ...req.body,
@@ -188,7 +232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/member-spotlights", ensureAdmin, async (req, res) => {
+  app.post("/api/member-spotlights", ensureBoardMember, async (req, res) => {
     try {
       const validatedData = insertMemberSpotlightSchema.parse(req.body);
       
@@ -316,7 +360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Admin routes
-  app.get("/api/admin/users", ensureAdmin, async (req, res) => {
+  app.get("/api/admin/users", ensureBoardMember, async (req, res) => {
     try {
       const users = await storage.getAllUsers();
       res.json(users);
@@ -325,7 +369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/admin/events", ensureAdmin, async (req, res) => {
+  app.get("/api/admin/events", ensureBoardMember, async (req, res) => {
     try {
       const events = await storage.getAllEvents();
       
@@ -343,7 +387,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/admin/spotlights", ensureAdmin, async (req, res) => {
+  app.get("/api/admin/spotlights", ensureBoardMember, async (req, res) => {
     try {
       const spotlights = await storage.getAllMemberSpotlights();
       res.json(spotlights);
@@ -352,7 +396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/admin/stats", ensureAdmin, async (req, res) => {
+  app.get("/api/admin/stats", ensureBoardMember, async (req, res) => {
     try {
       const totalMembers = await storage.getUserCount();
       const activeEvents = await storage.getActiveEventCount();
@@ -471,6 +515,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "Failed to generate networking tips",
         error: error instanceof Error ? error.message : "Unknown error" 
       });
+    }
+  });
+
+  // Member communication routes
+  app.get("/api/messages/chapter/:chapterId", ensureAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const chapterId = parseInt(req.params.chapterId);
+      
+      // Only allow access to messages from user's own chapter (unless board member+)
+      if (user.userLevel === "member" && user.chapterId !== chapterId) {
+        return res.status(403).json({ message: "Access denied to this chapter's messages" });
+      }
+      
+      const messages = await storage.getMessagesByChapter(chapterId);
+      res.json(messages);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch messages" });
+    }
+  });
+
+  app.get("/api/messages/user/:userId", ensureAuthenticated, async (req, res) => {
+    try {
+      const fromUserId = req.user!.id;
+      const toUserId = parseInt(req.params.userId);
+      
+      const messages = await storage.getMessagesBetweenUsers(fromUserId, toUserId);
+      res.json(messages);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch messages" });
+    }
+  });
+
+  app.post("/api/messages", ensureAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const { toUserId, subject, message } = req.body;
+      
+      if (!user.chapterId) {
+        return res.status(400).json({ message: "User must belong to a chapter to send messages" });
+      }
+      
+      const newMessage = await storage.createMemberMessage({
+        fromUserId: user.id,
+        toUserId,
+        chapterId: user.chapterId,
+        subject,
+        message
+      });
+      
+      res.status(201).json(newMessage);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
+  app.patch("/api/messages/:messageId/read", ensureAuthenticated, async (req, res) => {
+    try {
+      const messageId = parseInt(req.params.messageId);
+      const success = await storage.markMessageAsRead(messageId);
+      
+      if (success) {
+        res.json({ message: "Message marked as read" });
+      } else {
+        res.status(500).json({ message: "Failed to mark message as read" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to mark message as read" });
+    }
+  });
+
+  // User level management (executive board only)
+  app.patch("/api/admin/users/:userId/level", ensureExecutiveBoard, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const { userLevel } = req.body;
+      
+      if (!["member", "board_member", "executive_board"].includes(userLevel)) {
+        return res.status(400).json({ message: "Invalid user level" });
+      }
+      
+      const updatedUser = await storage.updateUserLevel(userId, userLevel);
+      res.json(updatedUser);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update user level" });
     }
   });
 

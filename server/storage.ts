@@ -1,12 +1,16 @@
 import {
   users, 
+  chapters,
   events, 
   eventRegistrations, 
   leads, 
   userGoals, 
   memberSpotlights,
+  memberMessages,
   type User, 
-  type InsertUser, 
+  type InsertUser,
+  type Chapter,
+  type InsertChapter,
   type Event, 
   type InsertEvent,
   type EventRegistration,
@@ -16,7 +20,11 @@ import {
   type UserGoal,
   type InsertUserGoal,
   type MemberSpotlight,
-  type InsertMemberSpotlight
+  type InsertMemberSpotlight,
+  type MemberMessage,
+  type InsertMemberMessage,
+  type UserLevel,
+  USER_LEVELS
 } from "@shared/schema";
 import session from "express-session";
 import { db } from "./db";
@@ -32,8 +40,16 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, userData: Partial<User>): Promise<User>;
   updateUserPassword(id: number, newPassword: string): Promise<boolean>;
+  updateUserLevel(id: number, userLevel: UserLevel): Promise<User>;
   getAllUsers(): Promise<User[]>;
+  getUsersByChapter(chapterId: number): Promise<User[]>;
   getUserCount(): Promise<number>;
+  
+  // Chapter operations
+  getChapter(id: number): Promise<Chapter | undefined>;
+  getAllChapters(): Promise<Chapter[]>;
+  createChapter(chapter: InsertChapter): Promise<Chapter>;
+  updateChapter(id: number, chapterData: Partial<Chapter>): Promise<Chapter>;
   
   // Event operations
   getEvent(id: number): Promise<Event | undefined>;
@@ -64,6 +80,12 @@ export interface IStorage {
   getAllMemberSpotlights(): Promise<MemberSpotlight[]>;
   createMemberSpotlight(spotlight: InsertMemberSpotlight): Promise<MemberSpotlight>;
   
+  // Member message operations
+  getMessagesByChapter(chapterId: number): Promise<MemberMessage[]>;
+  getMessagesBetweenUsers(fromUserId: number, toUserId: number): Promise<MemberMessage[]>;
+  createMemberMessage(message: InsertMemberMessage): Promise<MemberMessage>;
+  markMessageAsRead(messageId: number): Promise<boolean>;
+  
   // Session store
   sessionStore: session.Store;
 }
@@ -85,10 +107,20 @@ export class DatabaseStorage implements IStorage {
   
   private async initAdminUser() {
     // Check if an admin user exists
-    const adminUser = await db.select().from(users).where(eq(users.isAdmin, true)).limit(1);
+    const adminUser = await db.select().from(users).where(eq(users.userLevel, USER_LEVELS.EXECUTIVE_BOARD)).limit(1);
     
     // If no admin user, create one
     if (adminUser.length === 0) {
+      // First ensure we have a default chapter
+      let defaultChapter = await db.select().from(chapters).limit(1);
+      if (defaultChapter.length === 0) {
+        defaultChapter = await db.insert(chapters).values({
+          name: "Charlotte Main",
+          location: "Charlotte, NC",
+          description: "Primary BLU chapter in Charlotte"
+        }).returning();
+      }
+
       await this.createUser({
         username: "admin",
         password: "password123", // In real app, this would be hashed
@@ -101,8 +133,14 @@ export class DatabaseStorage implements IStorage {
         expertise: "System Administration",
         profileImage: "",
         phoneNumber: "704-555-1234",
-        isAdmin: true
+        chapterId: defaultChapter[0].id
       });
+
+      // Update the created user to executive board level
+      const createdAdmin = await this.getUserByUsername("admin");
+      if (createdAdmin) {
+        await this.updateUserLevel(createdAdmin.id, USER_LEVELS.EXECUTIVE_BOARD);
+      }
     }
   }
 
@@ -120,7 +158,6 @@ export class DatabaseStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const result = await db.insert(users).values({
       ...insertUser,
-      isAdmin: insertUser.isAdmin ?? false,
       joinedAt: new Date()
     }).returning();
     
@@ -129,7 +166,7 @@ export class DatabaseStorage implements IStorage {
   
   async updateUser(id: number, userData: Partial<User>): Promise<User> {
     // Don't allow changing sensitive fields
-    const { id: _, password: __, isAdmin: ___, joinedAt: ____, ...safeUserData } = userData;
+    const { id: _, password: __, joinedAt: ___, ...safeUserData } = userData;
     
     const result = await db.update(users)
       .set(safeUserData)
@@ -155,6 +192,44 @@ export class DatabaseStorage implements IStorage {
   async getUserCount(): Promise<number> {
     const result = await db.select({ count: sql<number>`count(*)` }).from(users);
     return result[0].count;
+  }
+
+  async updateUserLevel(id: number, userLevel: UserLevel): Promise<User> {
+    const result = await db.update(users)
+      .set({ userLevel })
+      .where(eq(users.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getUsersByChapter(chapterId: number): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.chapterId, chapterId));
+  }
+
+  // Chapter operations
+  async getChapter(id: number): Promise<Chapter | undefined> {
+    const result = await db.select().from(chapters).where(eq(chapters.id, id));
+    return result[0];
+  }
+
+  async getAllChapters(): Promise<Chapter[]> {
+    return await db.select().from(chapters).where(eq(chapters.isActive, true));
+  }
+
+  async createChapter(chapter: InsertChapter): Promise<Chapter> {
+    const result = await db.insert(chapters).values({
+      ...chapter,
+      createdAt: new Date()
+    }).returning();
+    return result[0];
+  }
+
+  async updateChapter(id: number, chapterData: Partial<Chapter>): Promise<Chapter> {
+    const result = await db.update(chapters)
+      .set(chapterData)
+      .where(eq(chapters.id, id))
+      .returning();
+    return result[0];
   }
   
   // Event operations
@@ -354,6 +429,44 @@ export class DatabaseStorage implements IStorage {
       ...result[0],
       user: user!
     } as unknown as MemberSpotlight;
+  }
+
+  // Member message operations
+  async getMessagesByChapter(chapterId: number): Promise<MemberMessage[]> {
+    return await db.select().from(memberMessages)
+      .where(eq(memberMessages.chapterId, chapterId))
+      .orderBy(desc(memberMessages.sentAt));
+  }
+
+  async getMessagesBetweenUsers(fromUserId: number, toUserId: number): Promise<MemberMessage[]> {
+    return await db.select().from(memberMessages)
+      .where(
+        and(
+          eq(memberMessages.fromUserId, fromUserId),
+          eq(memberMessages.toUserId, toUserId)
+        )
+      )
+      .orderBy(desc(memberMessages.sentAt));
+  }
+
+  async createMemberMessage(message: InsertMemberMessage): Promise<MemberMessage> {
+    const result = await db.insert(memberMessages).values({
+      ...message,
+      sentAt: new Date()
+    }).returning();
+    return result[0];
+  }
+
+  async markMessageAsRead(messageId: number): Promise<boolean> {
+    try {
+      await db.update(memberMessages)
+        .set({ isRead: true })
+        .where(eq(memberMessages.id, messageId));
+      return true;
+    } catch (error) {
+      console.error("Error marking message as read:", error);
+      return false;
+    }
   }
 }
 

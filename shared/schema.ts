@@ -2,6 +2,16 @@ import { pgTable, text, serial, integer, boolean, timestamp, json, uuid as pgUui
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Chapters schema
+export const chapters = pgTable("chapters", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  location: text("location").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // User schema
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -16,13 +26,21 @@ export const users = pgTable("users", {
   expertise: text("expertise"),
   profileImage: text("profile_image"),
   isAdmin: boolean("is_admin").default(false),
+  userLevel: text("user_level", { enum: ["member", "board_member", "executive_board"] }).default("member").notNull(),
+  chapterId: integer("chapter_id").references(() => chapters.id),
   phoneNumber: text("phone_number"),
   joinedAt: timestamp("joined_at").defaultNow(),
+});
+
+export const insertChapterSchema = createInsertSchema(chapters).omit({
+  id: true,
+  createdAt: true,
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   isAdmin: true,
+  userLevel: true,
   joinedAt: true,
 });
 
@@ -120,7 +138,107 @@ export const insertMemberSpotlightSchema = createInsertSchema(memberSpotlights).
   createdAt: true,
 });
 
+// Member communications schema
+export const memberMessages = pgTable("member_messages", {
+  id: serial("id").primaryKey(),
+  fromUserId: integer("from_user_id").references(() => users.id).notNull(),
+  toUserId: integer("to_user_id").references(() => users.id).notNull(),
+  chapterId: integer("chapter_id").references(() => chapters.id).notNull(),
+  subject: text("subject").notNull(),
+  message: text("message").notNull(),
+  isRead: boolean("is_read").default(false),
+  sentAt: timestamp("sent_at").defaultNow(),
+});
+
+export const insertMemberMessageSchema = createInsertSchema(memberMessages).omit({
+  id: true,
+  isRead: true,
+  sentAt: true,
+});
+
+// Relations
+import { relations } from "drizzle-orm";
+
+export const usersRelations = relations(users, ({ one, many }) => ({
+  chapter: one(chapters, {
+    fields: [users.chapterId],
+    references: [chapters.id],
+  }),
+  events: many(events),
+  eventRegistrations: many(eventRegistrations),
+  leads: many(leads),
+  userGoals: many(userGoals),
+  memberSpotlights: many(memberSpotlights),
+  sentMessages: many(memberMessages, { relationName: "sentMessages" }),
+  receivedMessages: many(memberMessages, { relationName: "receivedMessages" }),
+}));
+
+export const chaptersRelations = relations(chapters, ({ many }) => ({
+  users: many(users),
+  messages: many(memberMessages),
+}));
+
+export const eventsRelations = relations(events, ({ one, many }) => ({
+  createdBy: one(users, {
+    fields: [events.createdById],
+    references: [users.id],
+  }),
+  registrations: many(eventRegistrations),
+}));
+
+export const eventRegistrationsRelations = relations(eventRegistrations, ({ one }) => ({
+  event: one(events, {
+    fields: [eventRegistrations.eventId],
+    references: [events.id],
+  }),
+  user: one(users, {
+    fields: [eventRegistrations.userId],
+    references: [users.id],
+  }),
+}));
+
+export const leadsRelations = relations(leads, ({ one }) => ({
+  user: one(users, {
+    fields: [leads.userId],
+    references: [users.id],
+  }),
+}));
+
+export const userGoalsRelations = relations(userGoals, ({ one }) => ({
+  user: one(users, {
+    fields: [userGoals.userId],
+    references: [users.id],
+  }),
+}));
+
+export const memberSpotlightsRelations = relations(memberSpotlights, ({ one }) => ({
+  user: one(users, {
+    fields: [memberSpotlights.userId],
+    references: [users.id],
+  }),
+}));
+
+export const memberMessagesRelations = relations(memberMessages, ({ one }) => ({
+  fromUser: one(users, {
+    fields: [memberMessages.fromUserId],
+    references: [users.id],
+    relationName: "sentMessages",
+  }),
+  toUser: one(users, {
+    fields: [memberMessages.toUserId],
+    references: [users.id],
+    relationName: "receivedMessages",
+  }),
+  chapter: one(chapters, {
+    fields: [memberMessages.chapterId],
+    references: [chapters.id],
+  }),
+}));
+
 // Type definitions
+export type InsertChapter = z.infer<typeof insertChapterSchema>;
+export type Chapter = typeof chapters.$inferSelect;
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
@@ -138,3 +256,15 @@ export type UserGoal = typeof userGoals.$inferSelect;
 
 export type InsertMemberSpotlight = z.infer<typeof insertMemberSpotlightSchema>;
 export type MemberSpotlight = typeof memberSpotlights.$inferSelect;
+
+export type InsertMemberMessage = z.infer<typeof insertMemberMessageSchema>;
+export type MemberMessage = typeof memberMessages.$inferSelect;
+
+// User level permissions
+export const USER_LEVELS = {
+  MEMBER: "member",
+  BOARD_MEMBER: "board_member",
+  EXECUTIVE_BOARD: "executive_board",
+} as const;
+
+export type UserLevel = typeof USER_LEVELS[keyof typeof USER_LEVELS];
