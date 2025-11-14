@@ -2,7 +2,19 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { insertEventSchema, insertEventRegistrationSchema, insertLeadSchema, insertMemberSpotlightSchema, insertBoardMeetingMinutesSchema } from "@shared/schema";
+import {
+  insertEventSchema,
+  insertEventRegistrationSchema,
+  insertLeadSchema,
+  insertMemberSpotlightSchema,
+  insertBoardMeetingMinutesSchema,
+  insertOrganizationSettingsSchema,
+  insertCustomRoleSchema,
+  insertMembershipTierSchema,
+  insertCustomFieldDefinitionSchema,
+  insertGeoLocationLogSchema,
+  PERMISSIONS
+} from "@shared/schema";
 import { z } from "zod";
 import { generateNetworkingTips, NetworkingTipsRequest } from "./openai";
 
@@ -41,6 +53,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   };
 
+  // Ensure user is Super Admin (platform owner)
+  const ensureSuperAdmin = (req: Request, res: Response, next: Function) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    if (!req.user?.isSuperAdmin) {
+      return res.status(403).json({ message: "Super Admin access required" });
+    }
+    next();
+  };
+
   // User routes
   app.get("/api/members", ensureAuthenticated, async (req, res) => {
     try {
@@ -64,22 +87,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Chapter routes
   app.get("/api/chapters", ensureAuthenticated, async (req, res) => {
     try {
-      const chapters = await storage.getAllChapters();
+      const user = req.user!;
+      let chapters;
+
+      // Super Admin can see all organizations
+      if (user.isSuperAdmin) {
+        chapters = await storage.getAllChapters();
+      } else if (user.chapterId) {
+        // Regular users see only their organization
+        const chapter = await storage.getChapter(user.chapterId);
+        chapters = chapter ? [chapter] : [];
+      } else {
+        chapters = [];
+      }
+
       res.json(chapters);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch chapters" });
     }
   });
 
-  app.post("/api/chapters", ensureExecutiveBoard, async (req, res) => {
+  app.post("/api/chapters", async (req, res) => {
     try {
+      // Allow Super Admin or Executive Board to create organizations
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const user = req.user!;
+      if (!user.isSuperAdmin && user.userLevel !== "executive_board") {
+        return res.status(403).json({ message: "Super Admin or Executive Board access required" });
+      }
+
       const chapter = await storage.createChapter(req.body);
+
+      // Auto-create organization settings for new organization
+      await storage.createOrganizationSettings({
+        chapterId: chapter.id,
+        contactEmail: req.body.contactEmail || "contact@organization.com",
+        contactPhone: req.body.contactPhone || "",
+        address: req.body.address || "",
+        timezone: "America/New_York",
+        welcomeMessage: `Welcome to ${chapter.name}!`
+      });
+
       res.status(201).json(chapter);
     } catch (error) {
       res.status(500).json({ message: "Failed to create chapter" });
     }
   });
-  
+
+  // ============================================================================
+  // SUPER ADMIN ROUTES (Platform Owner)
+  // ============================================================================
+
+  // Create organization admin account
+  app.post("/api/super-admin/create-org-admin", ensureSuperAdmin, async (req, res) => {
+    try {
+      const { chapterId, username, password, fullName, email, company, title } = req.body;
+
+      // Validate required fields
+      if (!chapterId || !username || !password || !fullName || !email) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Verify the organization exists
+      const chapter = await storage.getChapter(chapterId);
+      if (!chapter) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+
+      // Check if username already exists
+      const existingUsername = await storage.getUserByUsername(username);
+      if (existingUsername) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      // Check if email already exists
+      const existingEmail = await storage.getUserByEmail(email);
+      if (existingEmail) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+
+      // Create org admin user
+      const newUser = await storage.createUser({
+        username,
+        password, // Will be hashed in storage layer
+        fullName,
+        email,
+        company: company || "",
+        title: title || "Administrator",
+        chapterId,
+        isOrgAdmin: true,
+        isAdmin: true, // For backward compatibility with existing checks
+        isSuperAdmin: false,
+        userLevel: "executive_board",
+        membershipStatus: "active",
+        joinedAt: new Date()
+      });
+
+      // Return user without password
+      const { password: _, ...userWithoutPassword } = newUser;
+      res.status(201).json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error creating org admin:", error);
+      res.status(500).json({ message: "Failed to create organization admin" });
+    }
+  });
+
   app.patch("/api/profile", ensureAuthenticated, async (req, res) => {
     try {
       const user = await storage.updateUser(req.user!.id, req.body);
@@ -718,7 +833,570 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================================
+  // ORGANIZATION SETTINGS ROUTES (White-labeling & Customization)
+  // ============================================================================
+
+  // Get organization settings
+  app.get("/api/organization/settings", ensureAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      if (!user.chapterId) {
+        return res.status(400).json({ message: "User must belong to an organization" });
+      }
+
+      const settings = await storage.getOrganizationSettings(user.chapterId);
+      res.json(settings);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch organization settings" });
+    }
+  });
+
+  // Update organization settings (board member+)
+  app.patch("/api/organization/settings", ensureBoardMember, async (req, res) => {
+    try {
+      const user = req.user!;
+      if (!user.chapterId) {
+        return res.status(400).json({ message: "User must belong to an organization" });
+      }
+
+      const settings = await storage.updateOrganizationSettings(user.chapterId, req.body);
+      res.json(settings);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update organization settings" });
+    }
+  });
+
+  // ============================================================================
+  // CUSTOM ROLES & PERMISSIONS ROUTES
+  // ============================================================================
+
+  // Get all roles for an organization
+  app.get("/api/organization/roles", ensureAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      if (!user.chapterId) {
+        return res.status(400).json({ message: "User must belong to an organization" });
+      }
+
+      const roles = await storage.getCustomRolesByChapter(user.chapterId);
+      res.json(roles);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch roles" });
+    }
+  });
+
+  // Create a custom role (board member+)
+  app.post("/api/organization/roles", ensureBoardMember, async (req, res) => {
+    try {
+      const user = req.user!;
+      if (!user.chapterId) {
+        return res.status(400).json({ message: "User must belong to an organization" });
+      }
+
+      const validatedData = insertCustomRoleSchema.parse({
+        ...req.body,
+        chapterId: user.chapterId,
+        isSystemRole: false
+      });
+
+      const role = await storage.createCustomRole(validatedData);
+      res.status(201).json(role);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid role data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create role" });
+    }
+  });
+
+  // Update a custom role (board member+)
+  app.patch("/api/organization/roles/:roleId", ensureBoardMember, async (req, res) => {
+    try {
+      const roleId = parseInt(req.params.roleId);
+      const user = req.user!;
+
+      // Get the role to verify it belongs to the user's chapter
+      const role = await storage.getCustomRole(roleId);
+      if (!role) {
+        return res.status(404).json({ message: "Role not found" });
+      }
+
+      if (role.chapterId !== user.chapterId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      if (role.isSystemRole) {
+        return res.status(403).json({ message: "Cannot modify system roles" });
+      }
+
+      const updatedRole = await storage.updateCustomRole(roleId, req.body);
+      res.json(updatedRole);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update role" });
+    }
+  });
+
+  // Delete a custom role (board member+)
+  app.delete("/api/organization/roles/:roleId", ensureBoardMember, async (req, res) => {
+    try {
+      const roleId = parseInt(req.params.roleId);
+      const user = req.user!;
+
+      const role = await storage.getCustomRole(roleId);
+      if (!role) {
+        return res.status(404).json({ message: "Role not found" });
+      }
+
+      if (role.chapterId !== user.chapterId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      if (role.isSystemRole) {
+        return res.status(403).json({ message: "Cannot delete system roles" });
+      }
+
+      const success = await storage.deleteCustomRole(roleId);
+      if (success) {
+        res.json({ message: "Role deleted successfully" });
+      } else {
+        res.status(500).json({ message: "Failed to delete role" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete role" });
+    }
+  });
+
+  // ============================================================================
+  // MEMBERSHIP TIERS ROUTES
+  // ============================================================================
+
+  // Get all membership tiers for an organization
+  app.get("/api/organization/membership-tiers", ensureAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      if (!user.chapterId) {
+        return res.status(400).json({ message: "User must belong to an organization" });
+      }
+
+      const tiers = await storage.getMembershipTiersByChapter(user.chapterId);
+      res.json(tiers);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch membership tiers" });
+    }
+  });
+
+  // Create a membership tier (board member+)
+  app.post("/api/organization/membership-tiers", ensureBoardMember, async (req, res) => {
+    try {
+      const user = req.user!;
+      if (!user.chapterId) {
+        return res.status(400).json({ message: "User must belong to an organization" });
+      }
+
+      const validatedData = insertMembershipTierSchema.parse({
+        ...req.body,
+        chapterId: user.chapterId
+      });
+
+      const tier = await storage.createMembershipTier(validatedData);
+      res.status(201).json(tier);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid tier data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create membership tier" });
+    }
+  });
+
+  // Update a membership tier (board member+)
+  app.patch("/api/organization/membership-tiers/:tierId", ensureBoardMember, async (req, res) => {
+    try {
+      const tierId = parseInt(req.params.tierId);
+      const user = req.user!;
+
+      const tier = await storage.getMembershipTier(tierId);
+      if (!tier) {
+        return res.status(404).json({ message: "Membership tier not found" });
+      }
+
+      if (tier.chapterId !== user.chapterId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const updatedTier = await storage.updateMembershipTier(tierId, req.body);
+      res.json(updatedTier);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update membership tier" });
+    }
+  });
+
+  // Delete a membership tier (board member+)
+  app.delete("/api/organization/membership-tiers/:tierId", ensureBoardMember, async (req, res) => {
+    try {
+      const tierId = parseInt(req.params.tierId);
+      const user = req.user!;
+
+      const tier = await storage.getMembershipTier(tierId);
+      if (!tier) {
+        return res.status(404).json({ message: "Membership tier not found" });
+      }
+
+      if (tier.chapterId !== user.chapterId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const success = await storage.deleteMembershipTier(tierId);
+      if (success) {
+        res.json({ message: "Membership tier deleted successfully" });
+      } else {
+        res.status(500).json({ message: "Failed to delete membership tier" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete membership tier" });
+    }
+  });
+
+  // ============================================================================
+  // CUSTOM FIELDS ROUTES
+  // ============================================================================
+
+  // Get all custom field definitions for an organization
+  app.get("/api/organization/custom-fields", ensureAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      if (!user.chapterId) {
+        return res.status(400).json({ message: "User must belong to an organization" });
+      }
+
+      const fields = await storage.getCustomFieldDefinitionsByChapter(user.chapterId);
+      res.json(fields);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch custom fields" });
+    }
+  });
+
+  // Create a custom field definition (board member+)
+  app.post("/api/organization/custom-fields", ensureBoardMember, async (req, res) => {
+    try {
+      const user = req.user!;
+      if (!user.chapterId) {
+        return res.status(400).json({ message: "User must belong to an organization" });
+      }
+
+      const validatedData = insertCustomFieldDefinitionSchema.parse({
+        ...req.body,
+        chapterId: user.chapterId
+      });
+
+      const field = await storage.createCustomFieldDefinition(validatedData);
+      res.status(201).json(field);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid field data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create custom field" });
+    }
+  });
+
+  // Update a custom field definition (board member+)
+  app.patch("/api/organization/custom-fields/:fieldId", ensureBoardMember, async (req, res) => {
+    try {
+      const fieldId = parseInt(req.params.fieldId);
+      const user = req.user!;
+
+      const field = await storage.getCustomFieldDefinition(fieldId);
+      if (!field) {
+        return res.status(404).json({ message: "Custom field not found" });
+      }
+
+      if (field.chapterId !== user.chapterId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const updatedField = await storage.updateCustomFieldDefinition(fieldId, req.body);
+      res.json(updatedField);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update custom field" });
+    }
+  });
+
+  // Delete a custom field definition (board member+)
+  app.delete("/api/organization/custom-fields/:fieldId", ensureBoardMember, async (req, res) => {
+    try {
+      const fieldId = parseInt(req.params.fieldId);
+      const user = req.user!;
+
+      const field = await storage.getCustomFieldDefinition(fieldId);
+      if (!field) {
+        return res.status(404).json({ message: "Custom field not found" });
+      }
+
+      if (field.chapterId !== user.chapterId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const success = await storage.deleteCustomFieldDefinition(fieldId);
+      if (success) {
+        res.json({ message: "Custom field deleted successfully" });
+      } else {
+        res.status(500).json({ message: "Failed to delete custom field" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete custom field" });
+    }
+  });
+
+  // ============================================================================
+  // GEO-LOCATION TRACKING ROUTES
+  // ============================================================================
+
+  // Event check-in with geo-location
+  app.post("/api/events/:eventId/checkin", ensureAuthenticated, async (req, res) => {
+    try {
+      const eventId = parseInt(req.params.eventId);
+      const userId = req.user!.id;
+      const { latitude, longitude, location } = req.body;
+
+      // Get the event to check geo-fencing if enabled
+      const event = await storage.getEvent(eventId);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+
+      // Check if user is registered
+      const registration = await storage.getEventRegistration(eventId, userId);
+      if (!registration) {
+        return res.status(400).json({ message: "Not registered for this event" });
+      }
+
+      // Validate geo-location if required
+      if (event.requireGeoCheckin && event.latitude && event.longitude && latitude && longitude) {
+        const distance = calculateDistance(
+          parseFloat(latitude),
+          parseFloat(longitude),
+          parseFloat(event.latitude),
+          parseFloat(event.longitude)
+        );
+
+        if (distance > (event.geoFenceRadius || 100)) {
+          return res.status(403).json({
+            message: `You must be within ${event.geoFenceRadius || 100} meters of the event location to check in`,
+            distance: Math.round(distance)
+          });
+        }
+      }
+
+      // Update registration with check-in info
+      await storage.updateEventRegistration(registration.id, {
+        attended: true,
+        checkedInAt: new Date(),
+        checkInLatitude: latitude,
+        checkInLongitude: longitude,
+        checkInLocation: location
+      });
+
+      // Log geo-location
+      if (latitude && longitude) {
+        await storage.createGeoLocationLog({
+          userId,
+          eventType: "event_checkin",
+          latitude,
+          longitude,
+          location,
+          ipAddress: req.ip,
+          userAgent: req.headers['user-agent'],
+          eventId
+        });
+      }
+
+      res.json({ message: "Checked in successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to check in" });
+    }
+  });
+
+  // Get user's geo-location history
+  app.get("/api/geo-location/history", ensureAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const eventType = req.query.eventType as string | undefined;
+
+      const history = await storage.getGeoLocationLogByUser(userId, eventType);
+      res.json(history);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch location history" });
+    }
+  });
+
+  // Log a geo-location event (login, profile update, etc.)
+  app.post("/api/geo-location/log", ensureAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertGeoLocationLogSchema.parse({
+        ...req.body,
+        userId: req.user!.id,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent']
+      });
+
+      const log = await storage.createGeoLocationLog(validatedData);
+      res.status(201).json(log);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid geo-location data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to log geo-location" });
+    }
+  });
+
+  // ============================================================================
+  // ENHANCED USER MANAGEMENT ROUTES
+  // ============================================================================
+
+  // Create a new user (board member+)
+  app.post("/api/admin/users", ensureBoardMember, async (req, res) => {
+    try {
+      const user = req.user!;
+      const {
+        username,
+        email,
+        fullName,
+        company,
+        title,
+        userLevel,
+        membershipTier,
+        membershipStatus,
+        customRoleId,
+        customFields
+      } = req.body;
+
+      // Check if username or email already exists
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      const existingEmail = await storage.getUserByEmail(email);
+      if (existingEmail) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+
+      // Generate a temporary password
+      const tempPassword = generateTempPassword();
+
+      const newUser = await storage.createUser({
+        username,
+        password: tempPassword, // Will be hashed in storage layer
+        email,
+        fullName,
+        company,
+        title,
+        userLevel: userLevel || "member",
+        chapterId: user.chapterId,
+        membershipTier,
+        membershipStatus: membershipStatus || "pending",
+        customRoleId,
+        customFields: customFields || {}
+      });
+
+      // In production, send email with temp password
+      res.status(201).json({
+        ...newUser,
+        temporaryPassword: tempPassword // Only in response, not stored
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
+  // Update user membership status (board member+)
+  app.patch("/api/admin/users/:userId/membership", ensureBoardMember, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const { membershipStatus, membershipTier, membershipExpiresAt } = req.body;
+
+      const updatedUser = await storage.updateUser(userId, {
+        membershipStatus,
+        membershipTier,
+        membershipExpiresAt: membershipExpiresAt ? new Date(membershipExpiresAt) : undefined
+      });
+
+      res.json(updatedUser);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update membership status" });
+    }
+  });
+
+  // Update user custom role (board member+)
+  app.patch("/api/admin/users/:userId/role", ensureBoardMember, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const { customRoleId } = req.body;
+
+      // Verify the role exists and belongs to the same chapter
+      if (customRoleId) {
+        const role = await storage.getCustomRole(customRoleId);
+        if (!role || role.chapterId !== req.user!.chapterId) {
+          return res.status(400).json({ message: "Invalid role" });
+        }
+      }
+
+      const updatedUser = await storage.updateUser(userId, { customRoleId });
+      res.json(updatedUser);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update user role" });
+    }
+  });
+
+  // Update user custom fields
+  app.patch("/api/profile/custom-fields", ensureAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const { customFields } = req.body;
+
+      const updatedUser = await storage.updateUser(userId, { customFields });
+      res.json(updatedUser);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update custom fields" });
+    }
+  });
+
+  // Get available permissions list
+  app.get("/api/permissions", ensureBoardMember, async (req, res) => {
+    try {
+      res.json(Object.values(PERMISSIONS));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch permissions" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
+}
+
+// Helper function to calculate distance between two coordinates (Haversine formula)
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371e3; // Earth's radius in meters
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c; // Distance in meters
+}
+
+// Helper function to generate temporary password
+function generateTempPassword(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%^&*';
+  let password = '';
+  for (let i = 0; i < 12; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
 }

@@ -1,4 +1,4 @@
-import { Search, LayoutDashboard, Calendar, Users, BookOpenText, BarChart3, UserCog, Settings, LightbulbIcon } from "lucide-react";
+import { Search, LayoutDashboard, Calendar, Users, BookOpenText, BarChart3, UserCog, Settings, LightbulbIcon, Building2, Crown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "wouter";
@@ -16,6 +16,11 @@ const navItems = [
 
 const adminItems = [
   { href: "/admin", icon: Settings, label: "Admin Panel" },
+  { href: "/organization/settings", icon: Building2, label: "Organization Settings" },
+];
+
+const superAdminItems = [
+  { href: "/super-admin", icon: Crown, label: "Super Admin" },
 ];
 
 export function Sidebar() {
@@ -57,7 +62,34 @@ export function Sidebar() {
             </li>
           ))}
           
-          {user?.isAdmin && (
+          {/* Super Admin Menu (Platform Owner) */}
+          {user?.isSuperAdmin && (
+            <>
+              <li className="mt-8 mb-2">
+                <div className="px-4 py-2 text-xs font-semibold text-neutral-500 uppercase">
+                  Platform Owner
+                </div>
+                {superAdminItems.map((item) => (
+                  <Link key={item.href} href={item.href}>
+                    <a
+                      className={cn(
+                        "flex items-center px-4 py-2 font-medium",
+                        location === item.href
+                          ? "text-primary-500 bg-primary-50"
+                          : "text-neutral-700 hover:bg-neutral-50"
+                      )}
+                    >
+                      <item.icon className="mr-3 h-5 w-5" />
+                      <span>{item.label}</span>
+                    </a>
+                  </Link>
+                ))}
+              </li>
+            </>
+          )}
+
+          {/* Org Admin Menu (if user is org admin or super admin) */}
+          {(user?.isAdmin || user?.isOrgAdmin || user?.isSuperAdmin) && (
             <>
               <li className="mt-8">
                 {adminItems.map((item) => (
