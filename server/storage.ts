@@ -1,18 +1,23 @@
 import {
-  users, 
+  users,
   chapters,
-  events, 
-  eventRegistrations, 
-  leads, 
-  userGoals, 
+  events,
+  eventRegistrations,
+  leads,
+  userGoals,
   memberSpotlights,
   memberMessages,
   boardMeetingMinutes,
-  type User, 
+  organizationSettings,
+  customRoles,
+  membershipTiers,
+  customFieldDefinitions,
+  geoLocationLog,
+  type User,
   type InsertUser,
   type Chapter,
   type InsertChapter,
-  type Event, 
+  type Event,
   type InsertEvent,
   type EventRegistration,
   type InsertEventRegistration,
@@ -26,6 +31,16 @@ import {
   type InsertMemberMessage,
   type BoardMeetingMinutes,
   type InsertBoardMeetingMinutes,
+  type OrganizationSettings,
+  type InsertOrganizationSettings,
+  type CustomRole,
+  type InsertCustomRole,
+  type MembershipTier,
+  type InsertMembershipTier,
+  type CustomFieldDefinition,
+  type InsertCustomFieldDefinition,
+  type GeoLocationLog,
+  type InsertGeoLocationLog,
   type UserLevel,
   USER_LEVELS
 } from "@shared/schema";
@@ -40,6 +55,7 @@ export interface IStorage {
   // User operations
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, userData: Partial<User>): Promise<User>;
   updateUserPassword(id: number, newPassword: string): Promise<boolean>;
@@ -47,25 +63,56 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   getUsersByChapter(chapterId: number): Promise<User[]>;
   getUserCount(): Promise<number>;
-  
+
   // Chapter operations
   getChapter(id: number): Promise<Chapter | undefined>;
   getAllChapters(): Promise<Chapter[]>;
   createChapter(chapter: InsertChapter): Promise<Chapter>;
   updateChapter(id: number, chapterData: Partial<Chapter>): Promise<Chapter>;
-  
+
+  // Organization settings operations
+  getOrganizationSettings(chapterId: number): Promise<OrganizationSettings | undefined>;
+  updateOrganizationSettings(chapterId: number, settings: Partial<OrganizationSettings>): Promise<OrganizationSettings>;
+  createOrganizationSettings(settings: InsertOrganizationSettings): Promise<OrganizationSettings>;
+
+  // Custom roles operations
+  getCustomRole(id: number): Promise<CustomRole | undefined>;
+  getCustomRolesByChapter(chapterId: number): Promise<CustomRole[]>;
+  createCustomRole(role: InsertCustomRole): Promise<CustomRole>;
+  updateCustomRole(id: number, role: Partial<CustomRole>): Promise<CustomRole>;
+  deleteCustomRole(id: number): Promise<boolean>;
+
+  // Membership tiers operations
+  getMembershipTier(id: number): Promise<MembershipTier | undefined>;
+  getMembershipTiersByChapter(chapterId: number): Promise<MembershipTier[]>;
+  createMembershipTier(tier: InsertMembershipTier): Promise<MembershipTier>;
+  updateMembershipTier(id: number, tier: Partial<MembershipTier>): Promise<MembershipTier>;
+  deleteMembershipTier(id: number): Promise<boolean>;
+
+  // Custom field definitions operations
+  getCustomFieldDefinition(id: number): Promise<CustomFieldDefinition | undefined>;
+  getCustomFieldDefinitionsByChapter(chapterId: number): Promise<CustomFieldDefinition[]>;
+  createCustomFieldDefinition(field: InsertCustomFieldDefinition): Promise<CustomFieldDefinition>;
+  updateCustomFieldDefinition(id: number, field: Partial<CustomFieldDefinition>): Promise<CustomFieldDefinition>;
+  deleteCustomFieldDefinition(id: number): Promise<boolean>;
+
+  // Geo-location log operations
+  createGeoLocationLog(log: InsertGeoLocationLog): Promise<GeoLocationLog>;
+  getGeoLocationLogByUser(userId: number, eventType?: string): Promise<GeoLocationLog[]>;
+
   // Event operations
   getEvent(id: number): Promise<Event | undefined>;
   getAllEvents(): Promise<Event[]>;
   createEvent(event: InsertEvent): Promise<Event>;
   getActiveEventCount(): Promise<number>;
-  
+
   // Event registration operations
   getEventRegistration(eventId: number, userId: number): Promise<EventRegistration | undefined>;
   getEventRegistrationCount(eventId: number): Promise<number>;
   createEventRegistration(registration: InsertEventRegistration): Promise<EventRegistration>;
+  updateEventRegistration(id: number, registration: Partial<EventRegistration>): Promise<EventRegistration>;
   getEventAttendanceCountByUser(userId: number): Promise<number>;
-  
+
   // Lead operations
   getLeadsByUser(userId: number): Promise<Lead[]>;
   createLead(lead: InsertLead): Promise<Lead>;
@@ -73,29 +120,29 @@ export interface IStorage {
   getTotalLeadCount(): Promise<number>;
   getTotalLeadValueByUser(userId: number): Promise<number>;
   getAverageLeadValue(): Promise<number>;
-  
+
   // User goals operations
   getCurrentUserGoals(userId: number): Promise<UserGoal | undefined>;
   createUserGoal(goal: InsertUserGoal): Promise<UserGoal>;
-  
+
   // Member spotlight operations
   getActiveMemberSpotlight(): Promise<MemberSpotlight | undefined>;
   getAllMemberSpotlights(): Promise<MemberSpotlight[]>;
   createMemberSpotlight(spotlight: InsertMemberSpotlight): Promise<MemberSpotlight>;
-  
+
   // Member message operations
   getMessagesByChapter(chapterId: number): Promise<MemberMessage[]>;
   getMessagesBetweenUsers(fromUserId: number, toUserId: number): Promise<MemberMessage[]>;
   createMemberMessage(message: InsertMemberMessage): Promise<MemberMessage>;
   markMessageAsRead(messageId: number): Promise<boolean>;
-  
+
   // Board meeting minutes operations
   getBoardMeetingMinutes(chapterId?: number): Promise<BoardMeetingMinutes[]>;
   getBoardMeetingMinute(id: number): Promise<BoardMeetingMinutes | undefined>;
   createBoardMeetingMinutes(minutes: InsertBoardMeetingMinutes): Promise<BoardMeetingMinutes>;
   updateBoardMeetingMinutes(id: number, minutes: Partial<BoardMeetingMinutes>): Promise<BoardMeetingMinutes>;
   deleteBoardMeetingMinutes(id: number): Promise<boolean>;
-  
+
   // Session store
   sessionStore: session.Store;
 }
@@ -174,6 +221,11 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     const result = await db.select().from(users).where(eq(users.username, username));
+    return result[0];
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.email, email));
     return result[0];
   }
 
@@ -536,6 +588,233 @@ export class DatabaseStorage implements IStorage {
       console.error("Error deleting board meeting minutes:", error);
       return false;
     }
+  }
+
+  // Organization settings operations
+  async getOrganizationSettings(chapterId: number): Promise<OrganizationSettings | undefined> {
+    const result = await db.select()
+      .from(organizationSettings)
+      .where(eq(organizationSettings.chapterId, chapterId));
+
+    if (result.length === 0) {
+      // Create default settings if none exist
+      return await this.createOrganizationSettings({ chapterId });
+    }
+
+    return result[0];
+  }
+
+  async createOrganizationSettings(settings: InsertOrganizationSettings): Promise<OrganizationSettings> {
+    const result = await db.insert(organizationSettings)
+      .values({
+        ...settings,
+        updatedAt: new Date()
+      })
+      .returning();
+    return result[0];
+  }
+
+  async updateOrganizationSettings(
+    chapterId: number,
+    settingsData: Partial<OrganizationSettings>
+  ): Promise<OrganizationSettings> {
+    const { id: _, chapterId: __, updatedAt: ___, ...safeData } = settingsData;
+
+    const result = await db.update(organizationSettings)
+      .set({
+        ...safeData,
+        updatedAt: new Date()
+      })
+      .where(eq(organizationSettings.chapterId, chapterId))
+      .returning();
+
+    return result[0];
+  }
+
+  // Custom roles operations
+  async getCustomRole(id: number): Promise<CustomRole | undefined> {
+    const result = await db.select()
+      .from(customRoles)
+      .where(eq(customRoles.id, id));
+    return result[0];
+  }
+
+  async getCustomRolesByChapter(chapterId: number): Promise<CustomRole[]> {
+    return await db.select()
+      .from(customRoles)
+      .where(eq(customRoles.chapterId, chapterId));
+  }
+
+  async createCustomRole(role: InsertCustomRole): Promise<CustomRole> {
+    const result = await db.insert(customRoles)
+      .values({
+        ...role,
+        createdAt: new Date()
+      })
+      .returning();
+    return result[0];
+  }
+
+  async updateCustomRole(id: number, roleData: Partial<CustomRole>): Promise<CustomRole> {
+    const { id: _, chapterId: __, createdAt: ___, ...safeData } = roleData;
+
+    const result = await db.update(customRoles)
+      .set(safeData)
+      .where(eq(customRoles.id, id))
+      .returning();
+
+    return result[0];
+  }
+
+  async deleteCustomRole(id: number): Promise<boolean> {
+    try {
+      await db.delete(customRoles)
+        .where(eq(customRoles.id, id));
+      return true;
+    } catch (error) {
+      console.error("Error deleting custom role:", error);
+      return false;
+    }
+  }
+
+  // Membership tiers operations
+  async getMembershipTier(id: number): Promise<MembershipTier | undefined> {
+    const result = await db.select()
+      .from(membershipTiers)
+      .where(eq(membershipTiers.id, id));
+    return result[0];
+  }
+
+  async getMembershipTiersByChapter(chapterId: number): Promise<MembershipTier[]> {
+    return await db.select()
+      .from(membershipTiers)
+      .where(eq(membershipTiers.chapterId, chapterId))
+      .orderBy(membershipTiers.sortOrder);
+  }
+
+  async createMembershipTier(tier: InsertMembershipTier): Promise<MembershipTier> {
+    const result = await db.insert(membershipTiers)
+      .values({
+        ...tier,
+        createdAt: new Date()
+      })
+      .returning();
+    return result[0];
+  }
+
+  async updateMembershipTier(id: number, tierData: Partial<MembershipTier>): Promise<MembershipTier> {
+    const { id: _, chapterId: __, createdAt: ___, ...safeData } = tierData;
+
+    const result = await db.update(membershipTiers)
+      .set(safeData)
+      .where(eq(membershipTiers.id, id))
+      .returning();
+
+    return result[0];
+  }
+
+  async deleteMembershipTier(id: number): Promise<boolean> {
+    try {
+      await db.delete(membershipTiers)
+        .where(eq(membershipTiers.id, id));
+      return true;
+    } catch (error) {
+      console.error("Error deleting membership tier:", error);
+      return false;
+    }
+  }
+
+  // Custom field definitions operations
+  async getCustomFieldDefinition(id: number): Promise<CustomFieldDefinition | undefined> {
+    const result = await db.select()
+      .from(customFieldDefinitions)
+      .where(eq(customFieldDefinitions.id, id));
+    return result[0];
+  }
+
+  async getCustomFieldDefinitionsByChapter(chapterId: number): Promise<CustomFieldDefinition[]> {
+    return await db.select()
+      .from(customFieldDefinitions)
+      .where(eq(customFieldDefinitions.chapterId, chapterId))
+      .orderBy(customFieldDefinitions.sortOrder);
+  }
+
+  async createCustomFieldDefinition(field: InsertCustomFieldDefinition): Promise<CustomFieldDefinition> {
+    const result = await db.insert(customFieldDefinitions)
+      .values({
+        ...field,
+        createdAt: new Date()
+      })
+      .returning();
+    return result[0];
+  }
+
+  async updateCustomFieldDefinition(
+    id: number,
+    fieldData: Partial<CustomFieldDefinition>
+  ): Promise<CustomFieldDefinition> {
+    const { id: _, chapterId: __, createdAt: ___, ...safeData } = fieldData;
+
+    const result = await db.update(customFieldDefinitions)
+      .set(safeData)
+      .where(eq(customFieldDefinitions.id, id))
+      .returning();
+
+    return result[0];
+  }
+
+  async deleteCustomFieldDefinition(id: number): Promise<boolean> {
+    try {
+      await db.delete(customFieldDefinitions)
+        .where(eq(customFieldDefinitions.id, id));
+      return true;
+    } catch (error) {
+      console.error("Error deleting custom field definition:", error);
+      return false;
+    }
+  }
+
+  // Geo-location log operations
+  async createGeoLocationLog(log: InsertGeoLocationLog): Promise<GeoLocationLog> {
+    const result = await db.insert(geoLocationLog)
+      .values({
+        ...log,
+        createdAt: new Date()
+      })
+      .returning();
+    return result[0];
+  }
+
+  async getGeoLocationLogByUser(userId: number, eventType?: string): Promise<GeoLocationLog[]> {
+    if (eventType) {
+      return await db.select()
+        .from(geoLocationLog)
+        .where(and(
+          eq(geoLocationLog.userId, userId),
+          eq(geoLocationLog.eventType, eventType as any)
+        ))
+        .orderBy(desc(geoLocationLog.createdAt));
+    }
+
+    return await db.select()
+      .from(geoLocationLog)
+      .where(eq(geoLocationLog.userId, userId))
+      .orderBy(desc(geoLocationLog.createdAt));
+  }
+
+  // Update event registration (for check-ins)
+  async updateEventRegistration(
+    id: number,
+    registrationData: Partial<EventRegistration>
+  ): Promise<EventRegistration> {
+    const { id: _, eventId: __, userId: ___, registeredAt: ____, ...safeData } = registrationData;
+
+    const result = await db.update(eventRegistrations)
+      .set(safeData)
+      .where(eq(eventRegistrations.id, id))
+      .returning();
+
+    return result[0];
   }
 }
 
