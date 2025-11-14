@@ -12,6 +12,7 @@ import AuthPage from "@/pages/auth-page";
 import NetworkingTipsPage from "@/pages/networking-tips-page";
 import BoardMinutesPage from "@/pages/board-minutes-page";
 import LandingPage from "@/pages/landing-page";
+import OrganizationSettingsPage from "@/pages/organization-settings-page";
 import { ProtectedRoute } from "./lib/protected-route";
 
 function App() {
@@ -29,6 +30,7 @@ function App() {
         <ProtectedRoute path="/board-minutes" component={BoardMinutesPage} />
         <ProtectedRoute path="/profile" component={ProfilePage} />
         <ProtectedRoute path="/admin" component={AdminPage} />
+        <ProtectedRoute path="/organization/settings" component={OrganizationSettingsPage} />
         <Route component={NotFound} />
       </Switch>
       <Toaster />
