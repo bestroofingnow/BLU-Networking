@@ -69,14 +69,16 @@ export const users = pgTable("users", {
   industry: text("industry"),
   expertise: text("expertise"),
   profileImage: text("profile_image"),
-  isAdmin: boolean("is_admin").default(false),
+  isSuperAdmin: boolean("is_super_admin").default(false), // Platform owner - manages all organizations
+  isOrgAdmin: boolean("is_org_admin").default(false), // Organization admin - manages their org
+  isAdmin: boolean("is_admin").default(false), // Legacy field for backward compatibility
   userLevel: text("user_level", { enum: ["member", "board_member", "executive_board"] }).default("member").notNull(),
   customRoleId: integer("custom_role_id"),
   chapterId: integer("chapter_id").references(() => chapters.id),
   phoneNumber: text("phone_number"),
   customFields: json("custom_fields").$type<Record<string, any>>().default({}),
   membershipTier: text("membership_tier"),
-  membershipStatus: text("membership_status", { enum: ["active", "inactive", "pending", "expired", "suspended"] }).default("pending"),
+  membershipStatus: text("membership_status", { enum: ["active", "inactive", "pending", "expired", "suspended"] }).default("active"),
   membershipExpiresAt: timestamp("membership_expires_at"),
   joinedAt: timestamp("joined_at").defaultNow(),
 });

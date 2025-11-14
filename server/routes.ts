@@ -53,6 +53,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     next();
   };
 
+  // Ensure user is Super Admin (platform owner)
+  const ensureSuperAdmin = (req: Request, res: Response, next: Function) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    if (!req.user?.isSuperAdmin) {
+      return res.status(403).json({ message: "Super Admin access required" });
+    }
+    next();
+  };
+
   // User routes
   app.get("/api/members", ensureAuthenticated, async (req, res) => {
     try {
@@ -76,22 +87,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Chapter routes
   app.get("/api/chapters", ensureAuthenticated, async (req, res) => {
     try {
-      const chapters = await storage.getAllChapters();
+      const user = req.user!;
+      let chapters;
+
+      // Super Admin can see all organizations
+      if (user.isSuperAdmin) {
+        chapters = await storage.getAllChapters();
+      } else if (user.chapterId) {
+        // Regular users see only their organization
+        const chapter = await storage.getChapter(user.chapterId);
+        chapters = chapter ? [chapter] : [];
+      } else {
+        chapters = [];
+      }
+
       res.json(chapters);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch chapters" });
     }
   });
 
-  app.post("/api/chapters", ensureExecutiveBoard, async (req, res) => {
+  app.post("/api/chapters", async (req, res) => {
     try {
+      // Allow Super Admin or Executive Board to create organizations
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const user = req.user!;
+      if (!user.isSuperAdmin && user.userLevel !== "executive_board") {
+        return res.status(403).json({ message: "Super Admin or Executive Board access required" });
+      }
+
       const chapter = await storage.createChapter(req.body);
+
+      // Auto-create organization settings for new organization
+      await storage.createOrganizationSettings({
+        chapterId: chapter.id,
+        contactEmail: req.body.contactEmail || "contact@organization.com",
+        contactPhone: req.body.contactPhone || "",
+        address: req.body.address || "",
+        timezone: "America/New_York",
+        welcomeMessage: `Welcome to ${chapter.name}!`
+      });
+
       res.status(201).json(chapter);
     } catch (error) {
       res.status(500).json({ message: "Failed to create chapter" });
     }
   });
-  
+
+  // ============================================================================
+  // SUPER ADMIN ROUTES (Platform Owner)
+  // ============================================================================
+
+  // Create organization admin account
+  app.post("/api/super-admin/create-org-admin", ensureSuperAdmin, async (req, res) => {
+    try {
+      const { chapterId, username, password, fullName, email, company, title } = req.body;
+
+      // Validate required fields
+      if (!chapterId || !username || !password || !fullName || !email) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // Verify the organization exists
+      const chapter = await storage.getChapter(chapterId);
+      if (!chapter) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+
+      // Check if username already exists
+      const existingUsername = await storage.getUserByUsername(username);
+      if (existingUsername) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      // Check if email already exists
+      const existingEmail = await storage.getUserByEmail(email);
+      if (existingEmail) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+
+      // Create org admin user
+      const newUser = await storage.createUser({
+        username,
+        password, // Will be hashed in storage layer
+        fullName,
+        email,
+        company: company || "",
+        title: title || "Administrator",
+        chapterId,
+        isOrgAdmin: true,
+        isAdmin: true, // For backward compatibility with existing checks
+        isSuperAdmin: false,
+        userLevel: "executive_board",
+        membershipStatus: "active",
+        joinedAt: new Date()
+      });
+
+      // Return user without password
+      const { password: _, ...userWithoutPassword } = newUser;
+      res.status(201).json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error creating org admin:", error);
+      res.status(500).json({ message: "Failed to create organization admin" });
+    }
+  });
+
   app.patch("/api/profile", ensureAuthenticated, async (req, res) => {
     try {
       const user = await storage.updateUser(req.user!.id, req.body);

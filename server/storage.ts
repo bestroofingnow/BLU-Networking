@@ -164,52 +164,45 @@ export class DatabaseStorage implements IStorage {
   
   private async initAdminUser() {
     try {
-      // First ensure we have a default chapter
-      let defaultChapter = await db.select().from(chapters).limit(1);
-      if (defaultChapter.length === 0) {
-        defaultChapter = await db.insert(chapters).values({
-          name: "Charlotte Main",
-          location: "Charlotte, NC",
-          description: "Primary BLU chapter in Charlotte"
-        }).returning();
-      }
+      // Check if super admin user already exists
+      const existingAdmin = await this.getUserByUsername("superadmin");
 
-      // Check if admin user already exists
-      const existingAdmin = await this.getUserByUsername("admin");
-      
       if (!existingAdmin) {
-        // Create admin user
-        await this.createUser({
-          username: "admin",
-          password: "password123", // In real app, this would be hashed
-          fullName: "Admin User",
-          email: "admin@blunetworking.org",
-          company: "BLU",
-          title: "Administrator",
-          bio: "System administrator for BLU networking app",
+        // Create super admin user (platform owner)
+        const superAdmin = await db.insert(users).values({
+          username: "superadmin",
+          password: "password123", // CHANGE THIS IMMEDIATELY!
+          fullName: "Platform Administrator",
+          email: "admin@yourplatform.com",
+          company: "Platform",
+          title: "Super Administrator",
+          bio: "Platform owner - manages all networking organizations",
           industry: "Technology",
-          expertise: "System Administration",
+          expertise: "Platform Management",
           profileImage: "",
-          phoneNumber: "704-555-1234",
-          chapterId: defaultChapter[0].id
-        });
+          phoneNumber: "",
+          isSuperAdmin: true,
+          isOrgAdmin: false,
+          isAdmin: true, // For backward compatibility
+          userLevel: "executive_board",
+          chapterId: null, // Super admin is not tied to any specific organization
+          membershipStatus: "active",
+          joinedAt: new Date()
+        }).returning();
 
-        // Update the created user to executive board level
-        const createdAdmin = await this.getUserByUsername("admin");
-        if (createdAdmin) {
-          await this.updateUserLevel(createdAdmin.id, USER_LEVELS.EXECUTIVE_BOARD);
-        }
-      } else {
-        // Ensure existing admin has correct chapter and level
-        if (!existingAdmin.chapterId) {
-          await this.updateUser(existingAdmin.id, { chapterId: defaultChapter[0].id });
-        }
-        if (existingAdmin.userLevel !== USER_LEVELS.EXECUTIVE_BOARD) {
-          await this.updateUserLevel(existingAdmin.id, USER_LEVELS.EXECUTIVE_BOARD);
-        }
+        console.log("✅ Super Admin created successfully!");
+        console.log("Login: superadmin / password123");
+        console.log("⚠️  CHANGE PASSWORD IMMEDIATELY!");
+      } else if (!existingAdmin.isSuperAdmin) {
+        // Upgrade existing admin to super admin
+        await db.update(users)
+          .set({ isSuperAdmin: true, chapterId: null })
+          .where(eq(users.username, "superadmin"));
+
+        console.log("✅ Upgraded existing admin to Super Admin");
       }
     } catch (error) {
-      console.error("Error initializing admin user:", error);
+      console.error("Error initializing super admin user:", error);
     }
   }
 

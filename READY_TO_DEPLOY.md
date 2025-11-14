@@ -189,54 +189,64 @@ This creates 15 tables with proper schemas.
 
 ### Step 3: First Login
 
-The app auto-creates an admin user:
+The app auto-creates a Super Admin user (platform owner):
 
 **Login:**
-- Username: `admin`
+- Username: `superadmin`
 - Password: `password123`
 
 **🚨 CHANGE THIS PASSWORD IMMEDIATELY!**
 
-### Step 4: Configure Your Organization
+**Note:** As Super Admin, you manage all networking organizations on your platform. When customers sign up and pay on your website, you'll create their organization and admin account through the Super Admin dashboard.
 
-1. Login as admin
-2. Go to **Organization Settings** (in sidebar)
-3. Configure each tab:
-   - **General:** Contact info
-   - **Branding:** Logo, colors
-   - **Features:** Enable what you need
-   - **Roles:** Create custom roles (optional)
-   - **Tiers:** Set pricing (optional)
-   - **Fields:** Custom member fields (optional)
+### Step 4: Create Your First Organization
+
+**As Super Admin:**
+
+1. Login as `superadmin`
+2. Click **"Create Organization"** from the Super Admin dashboard
+3. Fill in:
+   - Organization details (name, location, description)
+   - Org Admin account (who will manage this organization)
+4. Click **"Create Organization"**
+5. Send the org admin their login credentials
+
+**As Org Admin:**
+
+Once your customer (org admin) logs in, they can:
+1. Go to **Organization Settings** (in sidebar)
+2. Configure their organization:
+   - **General:** Contact info, timezone
+   - **Branding:** Logo, colors, custom domain
+   - **Features:** Enable/disable features
+   - **Roles:** Create custom roles with permissions
+   - **Tiers:** Set membership pricing (optional)
+   - **Fields:** Add custom member profile fields
+3. Start adding members to their organization
 
 ---
 
-## 💳 OPTIONAL: Connect Payment Processing
+## 💳 PAYMENTS - SIMPLIFIED MODEL
 
-**Why:** Accept membership dues and event ticket payments
+**How It Works:**
 
-### Quick Setup (15 Minutes)
+This platform uses a **simplified payment model** where YOU (the platform owner) handle payments on your own website:
 
-1. **Create Stripe account:** https://stripe.com
-2. **Get API keys:** Dashboard → Developers → API keys
-3. **Add to environment variables:**
-   ```
-   STRIPE_SECRET_KEY=sk_test_...
-   STRIPE_PUBLISHABLE_KEY=pk_test_...
-   ```
-4. **Set up webhooks:** Dashboard → Webhooks
-   - Endpoint: `https://yourapp.com/api/webhooks/stripe`
-   - Events: `payment_intent.succeeded`, `customer.subscription.*`
-   - Copy webhook secret to: `STRIPE_WEBHOOK_SECRET=whsec_...`
+1. **Your Website:** Customer visits your website and signs up
+2. **External Payment:** They pay YOU via Stripe, PayPal, or any payment processor
+3. **Super Admin Creates Organization:** Once paid, you login as Super Admin and create:
+   - Their organization
+   - Their org admin account
+4. **Send Credentials:** Email the org admin their login details
+5. **They're Live:** The org admin can now manage their organization and add members
 
-5. **Create products in Stripe:**
-   - Go to Products → Add product
-   - Set price and billing period
-   - Copy Price ID for your membership tiers
+**Why This Approach:**
+- ✅ **Simpler:** No complex integration needed
+- ✅ **Flexible:** Use any payment processor you want
+- ✅ **Control:** You manage pricing and billing yourself
+- ✅ **Faster:** Deploy in minutes, not hours
 
-**Cost:** 2.9% + $0.30 per transaction (no monthly fees)
-
-**See DEPLOYMENT.md for detailed guide**
+**Optional:** If your customers want to accept payments from THEIR members (for membership dues or event tickets), they can integrate Stripe separately using the foundation provided. See DEPLOYMENT.md for Stripe setup details.
 
 ---
 
@@ -293,33 +303,42 @@ The app auto-creates an admin user:
 
 ## 🎨 WHAT YOUR USERS WILL SEE
 
-### For Regular Members:
+### For Super Admin (You - Platform Owner):
+- ✅ Manage ALL organizations on the platform
+- ✅ Create new organizations after customer payment
+- ✅ Create org admin accounts for each organization
+- ✅ View organization statistics and activity
+- ✅ Platform-wide management capabilities
+
+### For Org Admins (Your Customers):
+Everything regular members can do, plus:
+- ✅ Manage their organization's settings
+- ✅ Configure white-labeling (logo, colors, domain)
+- ✅ Create custom roles with permissions
+- ✅ Set up membership tiers and pricing
+- ✅ Add custom fields to member profiles
+- ✅ Create and manage events
+- ✅ Approve/manage members
+- ✅ View organization analytics
+- ✅ Access board meeting minutes
+- ✅ Enable/disable features for their organization
+
+### For Board Members (Within Organizations):
+Everything regular members can do, plus:
+- ✅ Create and manage events
+- ✅ Create member spotlights
+- ✅ View analytics
+- ✅ Access board meeting minutes
+
+### For Regular Members (Within Organizations):
 - ✅ Beautiful dashboard with their stats
 - ✅ Browse and register for events
-- ✅ Check in to events with location verification
+- ✅ Check in to events with geo-location verification
 - ✅ View member directory
 - ✅ Track business leads
 - ✅ Send messages to other members
 - ✅ Get AI-powered networking tips
 - ✅ Update their profile
-
-### For Board Members:
-Everything above, plus:
-- ✅ Create and manage events
-- ✅ Create member spotlights
-- ✅ View all analytics
-- ✅ Access board meeting minutes
-- ✅ Configure organization settings
-
-### For Executive Board (Admins):
-Everything above, plus:
-- ✅ Manage all chapters/organizations
-- ✅ Create custom roles and assign permissions
-- ✅ Set up membership tiers and pricing
-- ✅ Configure white-labeling (logo, colors)
-- ✅ Add custom fields to member profiles
-- ✅ Manage users and memberships
-- ✅ Enable/disable features
 
 ---
 
@@ -336,11 +355,11 @@ Built-in security:
 - ✅ Permission-based access control
 
 **Before going live:**
-- [ ] Change default admin password
+- [ ] Change default Super Admin password
 - [ ] Use strong SESSION_SECRET
 - [ ] Enable HTTPS/SSL
-- [ ] Use production Stripe keys
 - [ ] Set up database backups
+- [ ] Configure email service for sending org admin credentials
 
 **See DEPLOYMENT.md Security Checklist for complete list**
 
@@ -419,25 +438,34 @@ Built-in security:
 1. ✅ Choose a deployment option (see above)
 2. ✅ Set up PostgreSQL database
 3. ✅ Deploy the application
-4. ✅ Run database migrations
-5. ✅ Login and change admin password
-6. ✅ Configure organization settings
+4. ✅ Run database migrations (`npm run db:push`)
+5. ✅ Login as Super Admin and change password
+6. ✅ Set up your payment page on your website
 
-### Soon (Recommended):
-1. Connect Stripe for payments (if needed)
-2. Connect Resend for emails (if needed)
-3. Customize branding (logo, colors)
-4. Create membership tiers
-5. Create custom roles for your org
-6. Add custom fields to profiles
-7. Invite first members
+### When You Get Your First Customer:
+1. Customer signs up and pays on your website
+2. Login as Super Admin
+3. Create their organization (name, location)
+4. Create their org admin account
+5. Email them their login credentials
+6. They configure their organization and start adding members
 
-### Later (Optional):
-1. Set up custom domain
-2. Configure advanced features
-3. Create email templates
-4. Set up monitoring
-5. Enable additional features
+### For Your Customers (Org Admins):
+Once they login, they should:
+1. Change their password
+2. Configure organization settings (branding, features)
+3. Create custom roles (optional)
+4. Set up membership tiers (optional)
+5. Add custom member fields (optional)
+6. Start inviting members
+7. Create their first event
+
+### Optional Platform Enhancements:
+1. Connect Resend for automated email notifications
+2. Set up custom domain for your platform
+3. Create email templates for org admin credentials
+4. Set up monitoring and analytics
+5. Add more features as needed
 
 ---
 
@@ -484,32 +512,41 @@ Built-in security:
 
 You now have a **production-ready, white-labeled, multi-tenant networking platform** that:
 
-✅ Does everything WildApricot does
-✅ Plus unique features they don't have
-✅ Costs a fraction of their pricing
-✅ Fully customizable and extensible
+✅ Does everything WildApricot does (and more!)
+✅ Unique features like geo-tagging, AI tips, and lead tracking
+✅ **Super Admin model** for managing multiple customer organizations
+✅ Simplified payment flow - handle payments your way
+✅ Fully customizable and extensible per organization
 ✅ Ready to deploy in under an hour
-✅ Completely yours to control
+✅ Completely yours to control and monetize
 
 **Your platform includes:**
-- 15 database tables
-- 50+ API endpoints
-- 12+ page components
-- Complete admin panel
-- Multi-organization support
-- Payment processing ready
-- Email communications ready
-- Geo-location tracking
-- Custom roles & permissions
-- Membership tier management
-- Custom fields builder
-- And much more!
+- **Super Admin Dashboard** - Manage all customer organizations
+- **15 database tables** - Complete data model
+- **50+ API endpoints** - Full REST API
+- **12+ page components** - Complete UI
+- **Multi-tenant architecture** - Data isolation per organization
+- **White-labeling** - Each org can brand their instance
+- **Geo-location tracking** - Event check-ins with GPS
+- **Custom roles & permissions** - 16 granular permissions
+- **Membership tier management** - Flexible pricing
+- **Custom fields builder** - 9 field types
+- **And much more!**
+
+**Business Model:**
+- Charge customers monthly/annually for their organization
+- Each customer gets their own branded networking platform
+- You handle payments on your website (Stripe, PayPal, etc.)
+- Super Admin dashboard makes onboarding instant
+- Scalable to hundreds of organizations
 
 **Total development value: $50,000-100,000**
 **Time saved: 3-6 months of development**
 
-## 🚀 Ready to launch your networking empire!
+## 🚀 Ready to launch your networking platform business!
 
 **Branch:** `claude/networking-app-wildapricot-features-01DgYJVPatStboKNNdTCcMb3`
+
+**Login:** `superadmin` / `password123` (change immediately!)
 
 **All code committed, tested, and ready for deployment!**
