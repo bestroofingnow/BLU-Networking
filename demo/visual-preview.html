@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BLU Networking Platform - Visual Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+        .demo-nav {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .card {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Demo Navigation Bar -->
+    <div class="demo-nav">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center space-x-8">
+                    <div class="text-2xl font-bold text-primary-600">BLU Networking</div>
+                    <div class="hidden md:flex space-x-4">
+                        <button onclick="showPage('dashboard')" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-100">Dashboard</button>
+                        <button onclick="showPage('events')" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-100">Events</button>
+                        <button onclick="showPage('members')" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-100">Members</button>
+                        <button onclick="showPage('analytics')" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-100">Analytics</button>
+                        <button onclick="showPage('leads')" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-100">Leads</button>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="bg-primary-100 text-primary-700 px-3 py-1 rounded-full text-sm font-medium">
+                        DEMO MODE
+                    </div>
+                    <div class="text-sm text-gray-700">John Smith</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Page -->
+    <div id="dashboard" class="page-content">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <header class="mb-8">
+                <h1 class="text-3xl font-bold text-gray-800">BLU Networking Platform</h1>
+                <p class="text-gray-600 mt-2">Welcome back, John Smith! Here's your business networking dashboard.</p>
+            </header>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div class="card bg-white rounded-lg shadow p-6">
+                    <div class="text-sm font-medium text-gray-500">Total Connections</div>
+                    <div class="text-2xl font-bold mt-2">42</div>
+                    <p class="text-xs text-gray-500 mt-2">Members in your organization</p>
+                </div>
+
+                <div class="card bg-white rounded-lg shadow p-6">
+                    <div class="text-sm font-medium text-gray-500">Upcoming Events</div>
+                    <div class="text-2xl font-bold mt-2">3</div>
+                    <p class="text-xs text-gray-500 mt-2">Next: Dec 15 Business Mixer</p>
+                </div>
+
+                <div class="card bg-white rounded-lg shadow p-6">
+                    <div class="text-sm font-medium text-gray-500">Active Leads</div>
+                    <div class="text-2xl font-bold mt-2">8</div>
+                    <p class="text-xs text-gray-500 mt-2">2 need follow-up</p>
+                </div>
+
+                <div class="card bg-white rounded-lg shadow p-6">
+                    <div class="text-sm font-medium text-gray-500">Lead Value</div>
+                    <div class="text-2xl font-bold mt-2">$12,500</div>
+                    <p class="text-xs text-gray-500 mt-2">Total estimated value</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Upcoming Events -->
+                <div class="lg:col-span-2">
+                    <div class="bg-white rounded-lg shadow">
+                        <div class="p-6 border-b">
+                            <h2 class="text-xl font-semibold">Upcoming Events</h2>
+                        </div>
+                        <div class="p-6 space-y-4">
+                            <div class="border-b pb-4">
+                                <h3 class="font-medium mb-1">Monthly Business Breakfast</h3>
+                                <p class="text-sm text-gray-600 mb-2">Saturday, December 15, 2025 at 8:00 AM</p>
+                                <p class="text-sm text-gray-600 mb-3">Location: Downtown Hotel Conference Room</p>
+                                <div class="flex items-center gap-2">
+                                    <button class="px-4 py-2 bg-primary-600 text-white rounded-md text-sm hover:bg-primary-700">Register Now</button>
+                                    <button class="px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">View Details</button>
+                                </div>
+                            </div>
+                            <div class="border-b pb-4">
+                                <h3 class="font-medium mb-1">Tech Networking Mixer</h3>
+                                <p class="text-sm text-gray-600 mb-2">Wednesday, December 20, 2025 at 6:00 PM</p>
+                                <p class="text-sm text-gray-600 mb-3">Location: Innovation Hub</p>
+                                <div class="flex items-center gap-2">
+                                    <span class="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">✓ Registered</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions & Stats -->
+                <div>
+                    <div class="bg-white rounded-lg shadow mb-6">
+                        <div class="p-6 border-b">
+                            <h2 class="text-xl font-semibold">Quick Actions</h2>
+                        </div>
+                        <div class="p-6 space-y-2">
+                            <button class="w-full text-left px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">Record New Lead</button>
+                            <button class="w-full text-left px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">Browse Member Directory</button>
+                            <button class="w-full text-left px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">View Events</button>
+                            <button class="w-full text-left px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">Update Your Profile</button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow">
+                        <div class="p-6 border-b">
+                            <h2 class="text-xl font-semibold">Your Stats</h2>
+                        </div>
+                        <div class="p-6 space-y-4">
+                            <div>
+                                <h3 class="text-sm font-medium mb-1">Events Attended</h3>
+                                <p class="text-2xl font-bold">12</p>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-medium mb-1">Active Leads</h3>
+                                <p class="text-2xl font-bold">8</p>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-medium mb-1">Network Size</h3>
+                                <p class="text-2xl font-bold">42</p>
+                            </div>
+                            <button class="w-full mt-4 px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">Get Networking Tips</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Events Page -->
+    <div id="events" class="page-content hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <header class="mb-8">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-800">Events</h1>
+                        <p class="text-gray-600 mt-2">Connect with other members at our networking events</p>
+                    </div>
+                    <button class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700">Create Event</button>
+                </div>
+            </header>
+
+            <div class="space-y-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">Upcoming Events</h2>
+                    <div class="space-y-4">
+                        <!-- Event Card 1 -->
+                        <div class="card bg-white rounded-lg shadow p-6">
+                            <div class="flex flex-col md:flex-row">
+                                <div class="bg-primary-500 text-white rounded text-center py-2 px-4 mb-4 md:mb-0 md:mr-6 min-w-[80px]">
+                                    <div class="text-xs font-medium">DEC</div>
+                                    <div class="text-2xl font-bold">15</div>
+                                </div>
+                                <div class="flex-1">
+                                    <h3 class="text-xl font-semibold text-gray-800 mb-2">Monthly Business Breakfast</h3>
+                                    <div class="space-y-2 mb-4">
+                                        <div class="flex items-center text-gray-600">
+                                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                            8:00 AM - 10:00 AM
+                                        </div>
+                                        <div class="flex items-center text-gray-600">
+                                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                            </svg>
+                                            Downtown Hotel Conference Room
+                                        </div>
+                                        <div class="flex items-center text-gray-600">
+                                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                            </svg>
+                                            Capacity: 50 attendees
+                                        </div>
+                                    </div>
+                                    <p class="text-gray-700 mb-4">Join us for our monthly networking breakfast where business leaders connect and share insights.</p>
+                                    <div class="flex gap-4">
+                                        <button class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700">Register Now</button>
+                                        <button class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50">View Details</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Event Card 2 -->
+                        <div class="card bg-white rounded-lg shadow p-6">
+                            <div class="flex flex-col md:flex-row">
+                                <div class="bg-primary-500 text-white rounded text-center py-2 px-4 mb-4 md:mb-0 md:mr-6 min-w-[80px]">
+                                    <div class="text-xs font-medium">DEC</div>
+                                    <div class="text-2xl font-bold">20</div>
+                                </div>
+                                <div class="flex-1">
+                                    <h3 class="text-xl font-semibold text-gray-800 mb-2">Tech Industry Meetup</h3>
+                                    <div class="space-y-2 mb-4">
+                                        <div class="flex items-center text-gray-600">
+                                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                            6:00 PM - 9:00 PM
+                                        </div>
+                                        <div class="flex items-center text-gray-600">
+                                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                            </svg>
+                                            Innovation Hub
+                                        </div>
+                                    </div>
+                                    <p class="text-gray-700 mb-4">Special focus on emerging technologies and digital transformation opportunities.</p>
+                                    <div class="flex gap-4">
+                                        <span class="px-4 py-2 bg-green-100 text-green-700 rounded-md font-medium">✓ Registered</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Members Page -->
+    <div id="members" class="page-content hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <header class="mb-8">
+                <h1 class="text-3xl font-bold text-gray-800">Member Directory</h1>
+                <p class="text-gray-600 mt-2">Connect with members of your organization</p>
+            </header>
+
+            <!-- Search Bar -->
+            <div class="mb-6">
+                <input type="text" placeholder="Search members..." class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500">
+            </div>
+
+            <!-- Members Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Member Card 1 -->
+                <div class="card bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center mb-4">
+                        <div class="w-16 h-16 bg-primary-200 rounded-full flex items-center justify-center text-primary-700 font-bold text-xl">
+                            JS
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="font-semibold text-lg">John Smith</h3>
+                            <p class="text-sm text-gray-600">Marketing Director</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm text-gray-600 mb-4">
+                        <div>📧 john.smith@email.com</div>
+                        <div>🏢 TechCorp Inc.</div>
+                        <div>📱 (555) 123-4567</div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="flex-1 px-3 py-2 bg-primary-600 text-white rounded-md text-sm hover:bg-primary-700">Send Message</button>
+                        <button class="px-3 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">Profile</button>
+                    </div>
+                </div>
+
+                <!-- Member Card 2 -->
+                <div class="card bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center mb-4">
+                        <div class="w-16 h-16 bg-purple-200 rounded-full flex items-center justify-center text-purple-700 font-bold text-xl">
+                            SJ
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="font-semibold text-lg">Sarah Johnson</h3>
+                            <p class="text-sm text-gray-600">CEO</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm text-gray-600 mb-4">
+                        <div>📧 sarah.j@startup.io</div>
+                        <div>🏢 Digital Innovations</div>
+                        <div>📱 (555) 234-5678</div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="flex-1 px-3 py-2 bg-primary-600 text-white rounded-md text-sm hover:bg-primary-700">Send Message</button>
+                        <button class="px-3 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">Profile</button>
+                    </div>
+                </div>
+
+                <!-- Member Card 3 -->
+                <div class="card bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center mb-4">
+                        <div class="w-16 h-16 bg-green-200 rounded-full flex items-center justify-center text-green-700 font-bold text-xl">
+                            MC
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="font-semibold text-lg">Michael Chen</h3>
+                            <p class="text-sm text-gray-600">CTO</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm text-gray-600 mb-4">
+                        <div>📧 m.chen@techsolutions.com</div>
+                        <div>🏢 TechSolutions LLC</div>
+                        <div>📱 (555) 345-6789</div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="flex-1 px-3 py-2 bg-primary-600 text-white rounded-md text-sm hover:bg-primary-700">Send Message</button>
+                        <button class="px-3 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">Profile</button>
+                    </div>
+                </div>
+
+                <!-- Member Card 4 -->
+                <div class="card bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center mb-4">
+                        <div class="w-16 h-16 bg-orange-200 rounded-full flex items-center justify-center text-orange-700 font-bold text-xl">
+                            EM
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="font-semibold text-lg">Emily Martinez</h3>
+                            <p class="text-sm text-gray-600">Sales Manager</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm text-gray-600 mb-4">
+                        <div>📧 emily@businessco.com</div>
+                        <div>🏢 Business Solutions Co</div>
+                        <div>📱 (555) 456-7890</div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="flex-1 px-3 py-2 bg-primary-600 text-white rounded-md text-sm hover:bg-primary-700">Send Message</button>
+                        <button class="px-3 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">Profile</button>
+                    </div>
+                </div>
+
+                <!-- Member Card 5 -->
+                <div class="card bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center mb-4">
+                        <div class="w-16 h-16 bg-blue-200 rounded-full flex items-center justify-center text-blue-700 font-bold text-xl">
+                            DW
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="font-semibold text-lg">David Washington</h3>
+                            <p class="text-sm text-gray-600">Financial Advisor</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm text-gray-600 mb-4">
+                        <div>📧 d.washington@finance.com</div>
+                        <div>🏢 Washington Financial</div>
+                        <div>📱 (555) 567-8901</div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="flex-1 px-3 py-2 bg-primary-600 text-white rounded-md text-sm hover:bg-primary-700">Send Message</button>
+                        <button class="px-3 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">Profile</button>
+                    </div>
+                </div>
+
+                <!-- Member Card 6 -->
+                <div class="card bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center mb-4">
+                        <div class="w-16 h-16 bg-pink-200 rounded-full flex items-center justify-center text-pink-700 font-bold text-xl">
+                            LT
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="font-semibold text-lg">Lisa Thompson</h3>
+                            <p class="text-sm text-gray-600">HR Director</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm text-gray-600 mb-4">
+                        <div>📧 lisa.t@hrpros.com</div>
+                        <div>🏢 HR Professionals</div>
+                        <div>📱 (555) 678-9012</div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="flex-1 px-3 py-2 bg-primary-600 text-white rounded-md text-sm hover:bg-primary-700">Send Message</button>
+                        <button class="px-3 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50">Profile</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analytics Page -->
+    <div id="analytics" class="page-content hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <header class="mb-8">
+                <div class="flex justify-between items-center">
+                    <h1 class="text-3xl font-bold text-gray-800">Performance Analytics</h1>
+                    <div class="flex gap-2">
+                        <select class="px-4 py-2 border border-gray-300 rounded-md">
+                            <option>Monthly</option>
+                            <option>Quarterly</option>
+                            <option>Yearly</option>
+                        </select>
+                        <button class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50">Export</button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div class="card bg-white rounded-lg shadow p-6">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm text-gray-500">Total Leads</p>
+                            <h3 class="text-2xl font-bold mt-1">156</h3>
+                        </div>
+                        <div class="bg-primary-100 p-3 rounded-full">
+                            <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex items-center">
+                        <div class="bg-green-100 rounded-full p-1 mr-2">
+                            <svg class="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+                            </svg>
+                        </div>
+                        <span class="text-xs font-medium text-green-600">+12%</span>
+                        <span class="text-xs text-gray-500 ml-1">vs previous period</span>
+                    </div>
+                </div>
+
+                <div class="card bg-white rounded-lg shadow p-6">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm text-gray-500">Conversion Rate</p>
+                            <h3 class="text-2xl font-bold mt-1">28%</h3>
+                        </div>
+                        <div class="bg-green-100 p-3 rounded-full">
+                            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex items-center">
+                        <div class="bg-green-100 rounded-full p-1 mr-2">
+                            <svg class="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+                            </svg>
+                        </div>
+                        <span class="text-xs font-medium text-green-600">+5%</span>
+                        <span class="text-xs text-gray-500 ml-1">vs previous period</span>
+                    </div>
+                </div>
+
+                <div class="card bg-white rounded-lg shadow p-6">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm text-gray-500">Events Attended</p>
+                            <h3 class="text-2xl font-bold mt-1">24</h3>
+                        </div>
+                        <div class="bg-purple-100 p-3 rounded-full">
+                            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex items-center">
+                        <div class="bg-red-100 rounded-full p-1 mr-2">
+                            <svg class="w-3 h-3 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+                            </svg>
+                        </div>
+                        <span class="text-xs font-medium text-red-600">-3%</span>
+                        <span class="text-xs text-gray-500 ml-1">vs previous period</span>
+                    </div>
+                </div>
+
+                <div class="card bg-white rounded-lg shadow p-6">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm text-gray-500">Member Connections</p>
+                            <h3 class="text-2xl font-bold mt-1">42</h3>
+                        </div>
+                        <div class="bg-blue-100 p-3 rounded-full">
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex items-center">
+                        <div class="bg-green-100 rounded-full p-1 mr-2">
+                            <svg class="w-3 h-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+                            </svg>
+                        </div>
+                        <span class="text-xs font-medium text-green-600">+8%</span>
+                        <span class="text-xs text-gray-500 ml-1">vs previous period</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <!-- Lead Sources Chart -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-xl font-semibold mb-4">Lead Sources</h2>
+                    <div class="h-64 flex items-center justify-center">
+                        <svg width="200" height="200" viewBox="0 0 200 200">
+                            <circle cx="100" cy="100" r="80" fill="#3b82f6" stroke="white" stroke-width="2"/>
+                            <path d="M 100 100 L 100 20 A 80 80 0 0 1 180 100 Z" fill="#8b5cf6" stroke="white" stroke-width="2"/>
+                            <path d="M 100 100 L 180 100 A 80 80 0 0 1 140 165 Z" fill="#10b981" stroke="white" stroke-width="2"/>
+                            <path d="M 100 100 L 140 165 A 80 80 0 0 1 60 165 Z" fill="#f59e0b" stroke="white" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <div class="mt-4 grid grid-cols-2 gap-2 text-sm">
+                        <div class="flex items-center"><span class="w-3 h-3 bg-blue-500 rounded-full mr-2"></span>Referral (45%)</div>
+                        <div class="flex items-center"><span class="w-3 h-3 bg-purple-500 rounded-full mr-2"></span>Events (25%)</div>
+                        <div class="flex items-center"><span class="w-3 h-3 bg-green-500 rounded-full mr-2"></span>Direct (20%)</div>
+                        <div class="flex items-center"><span class="w-3 h-3 bg-orange-500 rounded-full mr-2"></span>Online (10%)</div>
+                    </div>
+                </div>
+
+                <!-- Lead Status Chart -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-xl font-semibold mb-4">Lead Status Distribution</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span>Initial Contact</span>
+                                <span class="font-medium">45</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-blue-500 h-2 rounded-full" style="width: 75%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span>Follow-up Scheduled</span>
+                                <span class="font-medium">32</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-purple-500 h-2 rounded-full" style="width: 53%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span>Needs Follow-up</span>
+                                <span class="font-medium">24</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-orange-500 h-2 rounded-full" style="width: 40%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span>Converted</span>
+                                <span class="font-medium">43</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-green-500 h-2 rounded-full" style="width: 71%"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-sm mb-1">
+                                <span>Lost</span>
+                                <span class="font-medium">12</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="bg-red-500 h-2 rounded-full" style="width: 20%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Performers -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold mb-4">Top Performers</h2>
+                <div class="space-y-4">
+                    <div class="flex items-center">
+                        <div class="font-bold text-lg text-gray-400 w-8">#1</div>
+                        <div class="w-10 h-10 bg-primary-200 rounded-full flex items-center justify-center text-primary-700 font-semibold mr-3">SJ</div>
+                        <div class="flex-1">
+                            <div class="font-semibold">Sarah Johnson</div>
+                            <div class="text-sm text-gray-500">28 leads generated</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-semibold">$45,000</div>
+                            <div class="text-sm text-gray-500">Lead value</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="font-bold text-lg text-gray-400 w-8">#2</div>
+                        <div class="w-10 h-10 bg-purple-200 rounded-full flex items-center justify-center text-purple-700 font-semibold mr-3">DW</div>
+                        <div class="flex-1">
+                            <div class="font-semibold">David Washington</div>
+                            <div class="text-sm text-gray-500">24 leads generated</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-semibold">$38,500</div>
+                            <div class="text-sm text-gray-500">Lead value</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="font-bold text-lg text-gray-400 w-8">#3</div>
+                        <div class="w-10 h-10 bg-green-200 rounded-full flex items-center justify-center text-green-700 font-semibold mr-3">MC</div>
+                        <div class="flex-1">
+                            <div class="font-semibold">Michael Chen</div>
+                            <div class="text-sm text-gray-500">19 leads generated</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-semibold">$32,000</div>
+                            <div class="text-sm text-gray-500">Lead value</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leads Page -->
+    <div id="leads" class="page-content hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <header class="mb-8">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-800">Lead Management</h1>
+                        <p class="text-gray-600 mt-2">Track and manage your business leads</p>
+                    </div>
+                    <button class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700">Add New Lead</button>
+                </div>
+            </header>
+
+            <!-- Filters -->
+            <div class="bg-white rounded-lg shadow p-4 mb-6 flex gap-4">
+                <select class="px-4 py-2 border border-gray-300 rounded-md">
+                    <option>All Types</option>
+                    <option>Referral</option>
+                    <option>Event Connection</option>
+                    <option>Direct Outreach</option>
+                </select>
+                <select class="px-4 py-2 border border-gray-300 rounded-md">
+                    <option>All Status</option>
+                    <option>Initial Contact</option>
+                    <option>Follow-up Scheduled</option>
+                    <option>Needs Follow-up</option>
+                    <option>Converted</option>
+                </select>
+            </div>
+
+            <!-- Leads Table -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Follow-up</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">Jennifer Adams</div>
+                                <div class="text-sm text-gray-500">jennifer@company.com</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">ABC Corp</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Referral</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Follow-up Scheduled</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">$5,000</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Dec 18, 2025</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button class="text-primary-600 hover:text-primary-900 mr-3">Edit</button>
+                                <button class="text-gray-600 hover:text-gray-900">View</button>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">Robert Taylor</div>
+                                <div class="text-sm text-gray-500">robert@tech.io</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">TechVentures</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">Event Connection</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">Needs Follow-up</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">$8,500</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-medium">Overdue</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button class="text-primary-600 hover:text-primary-900 mr-3">Edit</button>
+                                <button class="text-gray-600 hover:text-gray-900">View</button>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">Amanda Foster</div>
+                                <div class="text-sm text-gray-500">amanda@startup.com</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Startup Inc</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Direct Outreach</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Initial Contact</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">$3,200</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Dec 20, 2025</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button class="text-primary-600 hover:text-primary-900 mr-3">Edit</button>
+                                <button class="text-gray-600 hover:text-gray-900">View</button>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">Kevin Zhang</div>
+                                <div class="text-sm text-gray-500">kevin@bigcorp.com</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">BigCorp Industries</td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Referral</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-emerald-100 text-emerald-800">Converted</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">$15,000</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">-</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <button class="text-primary-600 hover:text-primary-900 mr-3">Edit</button>
+                                <button class="text-gray-600 hover:text-gray-900">View</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showPage(pageName) {
+            // Hide all pages
+            document.querySelectorAll('.page-content').forEach(page => {
+                page.classList.add('hidden');
+            });
+
+            // Show selected page
+            document.getElementById(pageName).classList.remove('hidden');
+
+            // Update active button styling
+            document.querySelectorAll('.demo-nav button').forEach(btn => {
+                btn.classList.remove('bg-primary-100', 'text-primary-700');
+            });
+            event.target.classList.add('bg-primary-100', 'text-primary-700');
+        }
+
+        // Show dashboard by default
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('dashboard').classList.remove('hidden');
+        });
+    </script>
+</body>
+</html>
