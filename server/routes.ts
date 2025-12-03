@@ -17,6 +17,12 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import { generateNetworkingTips, NetworkingTipsRequest } from "./openai";
+import {
+  sendWelcomeEmail,
+  sendEventRegistrationEmail,
+  sendSpotlightNotificationEmail,
+  sendBoardMinutesEmail
+} from "./email";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication routes
@@ -273,6 +279,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const registration = await storage.createEventRegistration(validatedData);
+
+      // Send confirmation email
+      const user = await storage.getUser(validatedData.userId);
+      if (user && user.email) {
+        const eventDate = new Date(event.date).toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+        sendEventRegistrationEmail(
+          user.email,
+          user.username,
+          event.title,
+          eventDate,
+          event.location || 'TBA'
+        ).catch(err => console.error('Failed to send registration email:', err));
+      }
+
       res.status(201).json(registration);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -350,8 +375,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/member-spotlights", ensureBoardMember, async (req, res) => {
     try {
       const validatedData = insertMemberSpotlightSchema.parse(req.body);
-      
+
       const spotlight = await storage.createMemberSpotlight(validatedData);
+
+      // Send notification email to all members in the organization
+      const user = req.user!;
+      if (user.chapterId) {
+        const allMembers = await storage.getUsersByChapter(user.chapterId);
+        const memberEmails = allMembers
+          .filter(m => m.email && m.id !== spotlight.userId)
+          .map(m => m.email!);
+
+        if (memberEmails.length > 0) {
+          const spotlightedUser = await storage.getUser(spotlight.userId);
+          if (spotlightedUser) {
+            sendSpotlightNotificationEmail(
+              memberEmails,
+              spotlightedUser.fullName || spotlightedUser.username,
+              spotlight.achievement
+            ).catch(err => console.error('Failed to send spotlight notification:', err));
+          }
+        }
+      }
+
       res.status(201).json(spotlight);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -362,114 +408,269 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Analytics routes
+  // ============================================================================
+  // DASHBOARD ROUTES
+  // ============================================================================
+
+  // Get dashboard stats for the current user
+  app.get("/api/dashboard/stats", ensureAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      if (!user.chapterId) {
+        return res.status(400).json({ message: "User must belong to an organization" });
+      }
+
+      // Get total connections (members in the same chapter)
+      const allMembers = await storage.getUsersByChapter(user.chapterId);
+      const totalConnections = allMembers.length - 1; // Exclude self
+
+      // Get upcoming events (events that haven't happened yet)
+      const allEvents = await storage.getAllEvents();
+      const now = new Date();
+      const upcomingEvents = allEvents
+        .filter(event => new Date(event.date) >= now)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .slice(0, 5); // Return first 5 upcoming events
+
+      // Get active leads for the user
+      const userLeads = await storage.getLeadsByUser(user.id);
+      const activeLeads = userLeads.filter(lead =>
+        lead.status !== 'converted' && lead.status !== 'lost'
+      );
+
+      // Calculate total lead value
+      const totalLeadValue = await storage.getTotalLeadValueByUser(user.id);
+
+      // Get event attendance count
+      const eventsAttended = await storage.getEventAttendanceCountByUser(user.id);
+
+      // Get recent activity (member spotlights, recent messages)
+      const recentSpotlight = await storage.getActiveMemberSpotlight();
+
+      res.json({
+        totalConnections,
+        upcomingEventsCount: upcomingEvents.length,
+        upcomingEvents,
+        activeLeadsCount: activeLeads.length,
+        needsFollowUpCount: activeLeads.filter(lead => lead.status === 'needs_follow_up').length,
+        totalLeadValue,
+        eventsAttended,
+        recentSpotlight
+      });
+    } catch (error) {
+      console.error('Dashboard stats error:', error);
+      res.status(500).json({ message: "Failed to fetch dashboard stats" });
+    }
+  });
+
+  // ============================================================================
+  // ANALYTICS ROUTES
+  // ============================================================================
+
   app.get("/api/analytics/stats", ensureAuthenticated, async (req, res) => {
     try {
-      const period = req.query.period || "monthly";
-      
-      // Example stats data - in a real app, this would come from the database
+      const user = req.user!;
+      if (!user.chapterId) {
+        return res.status(400).json({ message: "User must belong to an organization" });
+      }
+
+      // Get all members in the organization for calculations
+      const allMembers = await storage.getUsersByChapter(user.chapterId);
+
+      // Calculate total leads across the organization
+      let totalLeads = 0;
+      let totalConvertedLeads = 0;
+      for (const member of allMembers) {
+        const memberLeads = await storage.getLeadsByUser(member.id);
+        totalLeads += memberLeads.length;
+        totalConvertedLeads += memberLeads.filter(l => l.status === 'converted').length;
+      }
+
+      // Calculate conversion rate
+      const conversionRate = totalLeads > 0 ? Math.round((totalConvertedLeads / totalLeads) * 100) : 0;
+
+      // Get events attended by all members
+      let totalEventsAttended = 0;
+      for (const member of allMembers) {
+        const attended = await storage.getEventAttendanceCountByUser(member.id);
+        totalEventsAttended += attended;
+      }
+
+      // Total connections (members in organization)
+      const connections = allMembers.length;
+
       const stats = {
-        totalLeads: 43,
-        leadChange: 12,
-        conversionRate: 23,
-        conversionRateChange: 5,
-        eventsAttended: 8,
-        eventsChange: -10,
-        connections: 127,
-        connectionsChange: 15
+        totalLeads,
+        leadChange: 0, // Would need historical data to calculate change
+        conversionRate,
+        conversionRateChange: 0, // Would need historical data
+        eventsAttended: totalEventsAttended,
+        eventsChange: 0, // Would need historical data
+        connections,
+        connectionsChange: 0 // Would need historical data
       };
-      
+
       res.json(stats);
     } catch (error) {
+      console.error('Analytics stats error:', error);
       res.status(500).json({ message: "Failed to fetch analytics stats" });
     }
   });
   
   app.get("/api/analytics/lead-types", ensureAuthenticated, async (req, res) => {
     try {
-      const period = req.query.period || "monthly";
-      
-      // Example lead type data
-      const leadTypes = [
-        { name: "Referral", value: 18 },
-        { name: "Event Connection", value: 12 },
-        { name: "Direct Outreach", value: 8 },
-        { name: "Online", value: 5 }
-      ];
-      
+      const user = req.user!;
+      if (!user.chapterId) {
+        return res.status(400).json({ message: "User must belong to an organization" });
+      }
+
+      // Get all members in the organization
+      const allMembers = await storage.getUsersByChapter(user.chapterId);
+
+      // Collect all leads and group by type
+      const typeCount: Record<string, number> = {};
+      for (const member of allMembers) {
+        const memberLeads = await storage.getLeadsByUser(member.id);
+        for (const lead of memberLeads) {
+          typeCount[lead.type] = (typeCount[lead.type] || 0) + 1;
+        }
+      }
+
+      // Convert to array format for charts
+      const leadTypes = Object.entries(typeCount).map(([name, value]) => ({
+        name,
+        value
+      }));
+
       res.json(leadTypes);
     } catch (error) {
+      console.error('Lead types error:', error);
       res.status(500).json({ message: "Failed to fetch lead types" });
     }
   });
   
   app.get("/api/analytics/lead-statuses", ensureAuthenticated, async (req, res) => {
     try {
-      const period = req.query.period || "monthly";
-      
-      // Example lead status data
-      const leadStatuses = [
-        { name: "Initial Contact", value: 15 },
-        { name: "Follow-up Scheduled", value: 10 },
-        { name: "Needs Follow-up", value: 8 },
-        { name: "Converted", value: 7 },
-        { name: "Lost", value: 3 }
-      ];
-      
+      const user = req.user!;
+      if (!user.chapterId) {
+        return res.status(400).json({ message: "User must belong to an organization" });
+      }
+
+      // Get all members in the organization
+      const allMembers = await storage.getUsersByChapter(user.chapterId);
+
+      // Collect all leads and group by status
+      const statusCount: Record<string, number> = {};
+      for (const member of allMembers) {
+        const memberLeads = await storage.getLeadsByUser(member.id);
+        for (const lead of memberLeads) {
+          statusCount[lead.status] = (statusCount[lead.status] || 0) + 1;
+        }
+      }
+
+      // Convert to array format for charts
+      const leadStatuses = Object.entries(statusCount).map(([name, value]) => ({
+        name,
+        value
+      }));
+
       res.json(leadStatuses);
     } catch (error) {
+      console.error('Lead statuses error:', error);
       res.status(500).json({ message: "Failed to fetch lead statuses" });
     }
   });
   
   app.get("/api/analytics/trends", ensureAuthenticated, async (req, res) => {
     try {
-      const period = req.query.period || "monthly";
-      
-      // Example trends data
-      const trends = [
-        { month: "Jan", leads: 5, connections: 12, events: 1 },
-        { month: "Feb", leads: 7, connections: 15, events: 2 },
-        { month: "Mar", leads: 10, connections: 20, events: 1 },
-        { month: "Apr", leads: 8, connections: 18, events: 2 },
-        { month: "May", leads: 12, connections: 25, events: 1 },
-        { month: "Jun", leads: 15, connections: 30, events: 2 }
-      ];
-      
+      const user = req.user!;
+      if (!user.chapterId) {
+        return res.status(400).json({ message: "User must belong to an organization" });
+      }
+
+      // Get all members in the organization
+      const allMembers = await storage.getUsersByChapter(user.chapterId);
+
+      // Collect all leads for the organization
+      const allLeads: any[] = [];
+      for (const member of allMembers) {
+        const memberLeads = await storage.getLeadsByUser(member.id);
+        allLeads.push(...memberLeads);
+      }
+
+      // Get all events
+      const allEvents = await storage.getAllEvents();
+
+      // Create trends for last 6 months
+      const trends = [];
+      const now = new Date();
+      for (let i = 5; i >= 0; i--) {
+        const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthName = monthDate.toLocaleString('default', { month: 'short' });
+
+        // Count leads created in this month
+        const leadsInMonth = allLeads.filter(lead => {
+          const leadDate = new Date(lead.createdAt);
+          return leadDate.getMonth() === monthDate.getMonth() &&
+                 leadDate.getFullYear() === monthDate.getFullYear();
+        }).length;
+
+        // Count events in this month
+        const eventsInMonth = allEvents.filter(event => {
+          const eventDate = new Date(event.date);
+          return eventDate.getMonth() === monthDate.getMonth() &&
+                 eventDate.getFullYear() === monthDate.getFullYear();
+        }).length;
+
+        trends.push({
+          month: monthName,
+          leads: leadsInMonth,
+          connections: allMembers.length, // Total members (connections don't change per month in current schema)
+          events: eventsInMonth
+        });
+      }
+
       res.json(trends);
     } catch (error) {
+      console.error('Trends error:', error);
       res.status(500).json({ message: "Failed to fetch trends" });
     }
   });
   
   app.get("/api/analytics/top-members", ensureAuthenticated, async (req, res) => {
     try {
-      const period = req.query.period || "monthly";
-      
-      // Example top members data
-      const topMembers = [
-        { 
-          name: "Sarah Johnson", 
-          leadsGenerated: 15, 
-          leadValue: 8750, 
-          avatarUrl: null 
-        },
-        { 
-          name: "David Washington", 
-          leadsGenerated: 12, 
-          leadValue: 6500, 
-          avatarUrl: null
-        },
-        { 
-          name: "Michael Chen", 
-          leadsGenerated: 10, 
-          leadValue: 5200, 
-          avatarUrl: null
-        }
-      ];
-      
+      const user = req.user!;
+      if (!user.chapterId) {
+        return res.status(400).json({ message: "User must belong to an organization" });
+      }
+
+      // Get all members in the organization
+      const allMembers = await storage.getUsersByChapter(user.chapterId);
+
+      // Calculate stats for each member
+      const memberStats = await Promise.all(
+        allMembers.map(async (member) => {
+          const leads = await storage.getLeadsByUser(member.id);
+          const leadValue = await storage.getTotalLeadValueByUser(member.id);
+
+          return {
+            name: member.fullName || member.username,
+            leadsGenerated: leads.length,
+            leadValue: leadValue || 0,
+            avatarUrl: member.profilePictureUrl || null
+          };
+        })
+      );
+
+      // Sort by leads generated and take top 5
+      const topMembers = memberStats
+        .sort((a, b) => b.leadsGenerated - a.leadsGenerated)
+        .slice(0, 5)
+        .filter(m => m.leadsGenerated > 0); // Only show members with leads
+
       res.json(topMembers);
     } catch (error) {
+      console.error('Top members error:', error);
       res.status(500).json({ message: "Failed to fetch top members" });
     }
   });
@@ -800,6 +1001,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const updatedMinutes = await storage.updateBoardMeetingMinutes(id, req.body);
+
+      // Send notification email if minutes are being published
+      if (req.body.isPublished === true && !existingMinutes.isPublished && user.chapterId) {
+        const allMembers = await storage.getUsersByChapter(user.chapterId);
+        const memberEmails = allMembers.filter(m => m.email).map(m => m.email!);
+
+        if (memberEmails.length > 0) {
+          const meetingDate = new Date(updatedMinutes.meetingDate).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          });
+          // Take first 200 characters of minutes as summary
+          const summary = updatedMinutes.minutes.substring(0, 200) +
+                         (updatedMinutes.minutes.length > 200 ? '...' : '');
+
+          sendBoardMinutesEmail(memberEmails, meetingDate, summary)
+            .catch(err => console.error('Failed to send board minutes notification:', err));
+        }
+      }
+
       res.json(updatedMinutes);
     } catch (error) {
       res.status(500).json({ message: "Failed to update meeting minutes" });
@@ -1299,7 +1521,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customFields: customFields || {}
       });
 
-      // In production, send email with temp password
+      // Send welcome email with temporary password
+      if (newUser.email) {
+        const chapter = await storage.getChapter(user.chapterId!);
+        const orgName = chapter?.name || "BLU Networking";
+        sendWelcomeEmail(newUser.email, newUser.username, orgName)
+          .catch(err => console.error('Failed to send welcome email:', err));
+      }
+
       res.status(201).json({
         ...newUser,
         temporaryPassword: tempPassword // Only in response, not stored
